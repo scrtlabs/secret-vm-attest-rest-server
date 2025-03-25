@@ -10,10 +10,10 @@ import (
 )
 
 func main() {
-	// Define command-line flags for secure mode, port, and IP address.
-	secure := flag.Bool("secure", true, "Enable HTTPS")
-	port := flag.Int("port", 29343, "Port to listen on")
-	ip := flag.String("ip", pkg.GetEnv("SECRETAI_REST_SERVER_IP", "0.0.0.0"), "IP address to bind to")
+	// Define command-line flags with default values coming from pkg.
+	secure := flag.Bool("secure", pkg.Secure, "Enable HTTPS")
+	port := flag.Int("port", pkg.Port, "Port to listen on")
+	ip := flag.String("ip", pkg.RESTServerIP, "IP address to bind to")
 	flag.Parse()
 
 	// Construct the address string.
