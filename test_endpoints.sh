@@ -129,9 +129,6 @@ echo -e "${YELLOW}SSL Verification: $(if [[ "$SKIP_SSL" == "true" ]]; then echo 
 # Test /status
 test_endpoint "/status" "Status"
 
-# Test /attestation
-test_endpoint "/attestation" "Attestation"
-
 # Test /gpu
 test_endpoint "/gpu" "GPU Attestation"
 

@@ -3,83 +3,90 @@ package pkg
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"time"
 )
 
 // StatusHandler handles the /status endpoint and returns a simple JSON status message.
+// Only GET requests are accepted.
 func StatusHandler(w http.ResponseWriter, r *http.Request) {
-	response := map[string]string{"status": "server is alive"}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-}
-
-// AttestationHandler executes an external command (e.g., "attest_tool")
-// and returns its JSON output. If the command fails or the output is not valid JSON,
-// an error message is returned.
-func AttestationHandler(w http.ResponseWriter, r *http.Request) {
-	cmd := exec.Command("attest_tool")
-	output, err := cmd.Output()
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Failed to generate attestation.",
-		})
+	if r.Method != http.MethodGet {
+		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
 		return
 	}
-
-	// Validate that the output is valid JSON.
-	var js map[string]interface{}
-	if err := json.Unmarshal(output, &js); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid attestation format.",
-		})
-		return
+	
+	response := map[string]string{
+		"status": "server is alive",
+		"time": time.Now().Format(time.RFC3339),
 	}
-
-	// Return the valid JSON output.
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(output)
+	respondWithJSON(w, http.StatusOK, response)
 }
 
 // MakeAttestationFileHandler returns an HTTP handler function that reads an attestation file.
-// It is used for the /gpu, /cpu, and /self endpoints.
+// It is used for the /gpu, /cpu, and /self endpoints. Only GET requests are accepted.
 func MakeAttestationFileHandler(fileName, attestationType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
+			return
+		}
+
 		// Construct the full file path.
 		filePath := filepath.Join(ReportDir, fileName)
 
 		// Check if the file exists.
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]string{
-				"error":   fmt.Sprintf("%s attestation not available", attestationType),
-				"details": fmt.Sprintf("The %s attestation data has not been generated or is not ready yet", attestationType),
-			})
+			log.Printf("%s attestation file not found: %s", attestationType, filePath)
+			respondWithError(w, http.StatusNotFound, 
+				fmt.Sprintf("%s attestation not available", attestationType),
+				fmt.Sprintf("The %s attestation data has not been generated or is not ready yet", attestationType))
 			return
 		}
 
 		// Read the file content.
-		content, err := ioutil.ReadFile(filePath)
+		content, err := os.ReadFile(filePath)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{
-				"error":   fmt.Sprintf("Failed to retrieve %s attestation data", attestationType),
-				"details": err.Error(),
-			})
+			log.Printf("Error reading %s attestation file: %v", attestationType, err)
+			respondWithError(w, http.StatusInternalServerError,
+				fmt.Sprintf("Failed to retrieve %s attestation data", attestationType),
+				err.Error())
 			return
 		}
 
-		// Return the file content as plain text.
-		w.Header().Set("Content-Type", "text/plain")
+		// Return the file content as plain text with proper headers.
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusOK)
 		w.Write(content)
 	}
+}
+
+// Helper function to respond with a JSON error message.
+func respondWithError(w http.ResponseWriter, code int, error string, details string) {
+	respondWithJSON(w, code, map[string]string{
+		"error":   error,
+		"details": details,
+	})
+}
+
+// Helper function to respond with JSON data.
+func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+	// Convert payload to JSON
+	response, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Error marshaling JSON response: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error":"Internal server error","details":"Failed to generate response"}`))
+		return
+	}
+
+	// Set response headers and write response
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(code)
+	w.Write(response)
 }

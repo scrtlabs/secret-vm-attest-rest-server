@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"secretai-attest-rest/pkg"
+	"syscall"
+	"time"
 )
 
 func main() {
@@ -24,36 +28,73 @@ func main() {
 
 	// Register endpoint handlers.
 	mux.HandleFunc("/status", pkg.StatusHandler)
-	mux.HandleFunc("/attestation", pkg.AttestationHandler)
 	mux.HandleFunc("/gpu", pkg.MakeAttestationFileHandler(pkg.GPUAttestationFile, "GPU"))
 	mux.HandleFunc("/cpu", pkg.MakeAttestationFileHandler(pkg.CPUAttestationFile, "CPU"))
 	mux.HandleFunc("/self", pkg.MakeAttestationFileHandler(pkg.SelfAttestationFile, "Self"))
 
-	// Wrap the mux with logging middleware.
-	handler := pkg.LoggingMiddleware(mux)
+	// Apply middleware chain - order matters here
+	// First CORS, then security headers, and finally logging
+	handler := pkg.LoggingMiddleware(
+		pkg.SecurityHeadersMiddleware(
+			pkg.CORSMiddleware(mux),
+		),
+	)
 
-	log.Printf("Server starting on %s, secure: %v", addr, *secure)
-	if *secure {
-		// Paths to the SSL certificate and key.
-		certPath := "cert/ssl_cert.pem"
-		keyPath := "cert/ssl_key.pem"
-		// Check if certificate and key files exist.
-		if _, err := os.Stat(certPath); os.IsNotExist(err) {
-			log.Fatalf("SSL certificate file not found at %s", certPath)
-		}
-		if _, err := os.Stat(keyPath); os.IsNotExist(err) {
-			log.Fatalf("SSL key file not found at %s", keyPath)
-		}
-		// Start the HTTPS server.
-		err := http.ListenAndServeTLS(addr, certPath, keyPath, handler)
-		if err != nil {
-			log.Fatalf("Failed to start HTTPS server: %v", err)
-		}
-	} else {
-		// Start the HTTP server.
-		err := http.ListenAndServe(addr, handler)
-		if err != nil {
-			log.Fatalf("Failed to start HTTP server: %v", err)
-		}
+	// Create a new server with reasonable timeout settings
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
+
+	// Start the server in a goroutine so it doesn't block
+	go func() {
+		log.Printf("Server starting on %s, secure: %v", addr, *secure)
+		var err error
+		
+		if *secure {
+			// Use configuration values for certificate paths
+			certPath := pkg.CertPath
+			keyPath := pkg.KeyPath
+			
+			// Check if certificate and key files exist.
+			if _, err := os.Stat(certPath); os.IsNotExist(err) {
+				log.Fatalf("SSL certificate file not found at %s", certPath)
+			}
+			if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+				log.Fatalf("SSL key file not found at %s", keyPath)
+			}
+			
+			// Start the HTTPS server.
+			err = server.ListenAndServeTLS(certPath, keyPath)
+		} else {
+			// Start the HTTP server.
+			err = server.ListenAndServe()
+		}
+		
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	// Set up channel for graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	// Block until we receive a signal
+	<-stop
+
+	// Create a deadline for graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Shutdown the server gracefully
+	log.Println("Server is shutting down...")
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Server shutdown failed: %v", err)
+	}
+	
+	log.Println("Server gracefully stopped")
 }
