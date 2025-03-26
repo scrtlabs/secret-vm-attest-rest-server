@@ -7,7 +7,6 @@ DEBUG_FLAGS=-gcflags="all=-N -l"
 RELEASE_FLAGS=-ldflags="-s -w"
 
 # Directories
-CMD_DIR=cmd
 BUILD_DIR=build
 
 # Ensure build directory exists
@@ -34,10 +33,10 @@ get-deps:
 debug: get-deps
 	@echo "===== Building debug version ====="
 	@echo "Using build flags: $(DEBUG_FLAGS)"
-	@echo "Main file: $(CMD_DIR)/main.go"
+	@echo "Main file: main.go"
 	@echo "Output binary: $(BUILD_DIR)/$(BINARY_NAME)-debug"
 	@echo "Building..."
-	$(GO) build -v $(DEBUG_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-debug $(CMD_DIR)/main.go
+	$(GO) build -v $(DEBUG_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-debug main.go
 	@echo "Build completed at: $$(date)"
 	@echo "File details: $$(ls -lh $(BUILD_DIR)/$(BINARY_NAME)-debug)"
 	@echo "===== Debug build complete ====="
@@ -46,10 +45,10 @@ debug: get-deps
 release: get-deps
 	@echo "===== Building release version ====="
 	@echo "Using build flags: $(RELEASE_FLAGS)"
-	@echo "Main file: $(CMD_DIR)/main.go"
+	@echo "Main file: main.go"
 	@echo "Output binary: $(BUILD_DIR)/$(BINARY_NAME)"
 	@echo "Building..."
-	$(GO) build -v $(RELEASE_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(CMD_DIR)/main.go
+	$(GO) build -v $(RELEASE_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) main.go
 	@echo "Build completed at: $$(date)"
 	@echo "File details: $$(ls -lh $(BUILD_DIR)/$(BINARY_NAME))"
 	@echo "===== Release build complete ====="
