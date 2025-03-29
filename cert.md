@@ -1,6 +1,6 @@
-# SSL Certificate Generation for SecretAI Attest REST Server
+# SSL Certificate Generation for SecretVM Attest REST Server
 
-This guide provides detailed instructions for generating SSL certificates for the SecretAI Attest REST Server. These certificates enable HTTPS, securing communication between clients and the server.
+This guide provides detailed instructions for generating SSL certificates for the SecretVM Attest REST Server. These certificates enable HTTPS, securing communication between clients and the server.
 
 ## Prerequisites
 
@@ -45,7 +45,7 @@ You'll be prompted to provide information for the certificate:
 | Country Name (2 letter code) | Your country's ISO code | `US` |
 | State or Province | Your state or province | `California` |
 | Locality Name | Your city | `San Francisco` |
-| Organization Name | Your company name | `SecretAI Inc.` |
+| Organization Name | Your company name | `SecretVM Inc.` |
 | Organizational Unit | Department or team | `Engineering` |
 | Common Name | **IMPORTANT**: Server hostname or IP address | `myserver.example.com` or `10.0.0.1` |
 | Email Address | Administrative contact | `admin@example.com` |
@@ -86,7 +86,7 @@ openssl x509 -in ssl_cert.pem -text -noout | head -15
 
 The second command displays information about your certificate, including the subject (Common Name) and validity period.
 
-## Integration with SecretAI Attest REST Server
+## Integration with SecretVM Attest REST Server
 
 The server automatically looks for certificate files at:
 - `cert/ssl_cert.pem`

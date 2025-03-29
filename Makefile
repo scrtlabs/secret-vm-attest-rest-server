@@ -1,8 +1,8 @@
-# SecretAI Attest REST Server - Makefile
+# SecretVM Attest REST Server - Makefile
 
 # Go command and flags
 GO=go
-BINARY_NAME=secretai-attest-rest
+BINARY_NAME=secret-vm-attest-rest-server
 DEBUG_FLAGS=-gcflags="all=-N -l"
 RELEASE_FLAGS=-ldflags="-s -w"
 
@@ -142,7 +142,7 @@ build-all: debug release
 
 # Help menu
 help:
-	@echo "SecretAI Attest REST Server Makefile"
+	@echo "SecretVM Attest REST Server Makefile"
 	@echo ""
 	@echo "Usage:"
 	@echo "  make [target]"

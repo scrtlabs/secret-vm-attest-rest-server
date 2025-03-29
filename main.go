@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"secretai-attest-rest/pkg"
+	"secret-vm-attest-rest-server/pkg"
 	"syscall"
 	"time"
 )
@@ -53,12 +53,12 @@ func main() {
 	go func() {
 		log.Printf("Server starting on %s, secure: %v", addr, *secure)
 		var err error
-		
+
 		if *secure {
 			// Use configuration values for certificate paths
 			certPath := pkg.CertPath
 			keyPath := pkg.KeyPath
-			
+
 			// Check if certificate and key files exist.
 			if _, err := os.Stat(certPath); os.IsNotExist(err) {
 				log.Fatalf("SSL certificate file not found at %s", certPath)
@@ -66,14 +66,14 @@ func main() {
 			if _, err := os.Stat(keyPath); os.IsNotExist(err) {
 				log.Fatalf("SSL key file not found at %s", keyPath)
 			}
-			
+
 			// Start the HTTPS server.
 			err = server.ListenAndServeTLS(certPath, keyPath)
 		} else {
 			// Start the HTTP server.
 			err = server.ListenAndServe()
 		}
-		
+
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start server: %v", err)
 		}
@@ -95,6 +95,6 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatalf("Server shutdown failed: %v", err)
 	}
-	
+
 	log.Println("Server gracefully stopped")
 }

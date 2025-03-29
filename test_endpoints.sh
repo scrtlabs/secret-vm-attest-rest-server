@@ -1,5 +1,5 @@
 #!/bin/bash
-# test_endpoints.sh - Script to test SecretAI Attest REST Server endpoints
+# test_endpoints.sh - Script to test SecretVM Attest REST Server endpoints
 # This script uses curl to test all endpoints and formats the output
 
 # Default server address
@@ -121,7 +121,7 @@ function test_endpoint {
 }
 
 # Test each endpoint
-echo -e "${BLUE}SecretAI Attest REST Server Endpoint Test${NC}"
+echo -e "${BLUE}SecretVM Attest REST Server Endpoint Test${NC}"
 echo -e "${YELLOW}Server: $SERVER${NC}"
 echo -e "${YELLOW}Format: $FORMAT${NC}"
 echo -e "${YELLOW}SSL Verification: $(if [[ "$SKIP_SSL" == "true" ]]; then echo "Disabled"; else echo "Enabled"; fi)${NC}"

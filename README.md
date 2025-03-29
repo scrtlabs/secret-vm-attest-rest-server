@@ -1,6 +1,6 @@
-# SecretAI Attest REST Server (Go)
+# SecretVM Attest REST Server (Go)
 
-SecretAI Attest REST Server is a lightweight REST server implemented in Go. It provides attestation reports for confidential virtual machines (VMs) over HTTPS. The server exposes multiple endpoints to return different attestation reports, including:
+SecretVM Attest REST Server is a lightweight REST server implemented in Go. It provides attestation reports for confidential virtual machines (VMs) over HTTPS. The server exposes multiple endpoints to return different attestation reports, including:
 
 - **/status** – Returns the server status.
 - **/attestation** – Executes an internal process (e.g., `attest_tool`) and returns a JSON attestation report.
@@ -25,7 +25,7 @@ SecretAI Attest REST Server is a lightweight REST server implemented in Go. It p
 ## Project Structure
 
 ```
-secretai-attest-rest/
+secret-vm-attest-rest-server/
 ├── .env                   # Environment variables file.
 ├── go.mod                 # Go module definition.
 ├── cmd/
@@ -41,33 +41,33 @@ secretai-attest-rest/
 The server configuration is managed in the `pkg/config.go` file. It uses [godotenv](https://github.com/joho/godotenv) to load environment variables from a `.env` file. Key configuration variables include:
 
 ### Server Configuration
-- **SECRETAI_REPORT_DIR**: Directory where attestation report files are stored (default: `reports`).
-- **SECRETAI_REST_SERVER_IP**: The IP address on which the server listens (default: `0.0.0.0`).
-- **SECRETAI_SECURE**: Boolean indicating whether to enable HTTPS (default: `true`).
-- **SECRETAI_REST_SERVER_PORT**: Port for the server (default: `29343`).
-- **SECRETAI_CERT_PATH**: Path to SSL certificate file (default: `cert/ssl_cert.pem`).
-- **SECRETAI_KEY_PATH**: Path to SSL key file (default: `cert/ssl_key.pem`).
+- **SECRETVM_REPORT_DIR**: Directory where attestation report files are stored (default: `reports`).
+- **SECRETVM_REST_SERVER_IP**: The IP address on which the server listens (default: `0.0.0.0`).
+- **SECRETVM_SECURE**: Boolean indicating whether to enable HTTPS (default: `true`).
+- **SECRETVM_REST_SERVER_PORT**: Port for the server (default: `29343`).
+- **SECRETVM_CERT_PATH**: Path to SSL certificate file (default: `cert/ssl_cert.pem`).
+- **SECRETVM_KEY_PATH**: Path to SSL key file (default: `cert/ssl_key.pem`).
 
 ### Attestation Configuration
-- **SECRETAI_ATTEST_TOOL**: Command name for the attestation tool (default: `attest_tool`).
-- **SECRETAI_ATTEST_TIMEOUT_SEC**: Timeout in seconds for attestation command execution (default: `10`).
+- **SECRETVM_ATTEST_TOOL**: Command name for the attestation tool (default: `attest_tool`).
+- **SECRETVM_ATTEST_TIMEOUT_SEC**: Timeout in seconds for attestation command execution (default: `10`).
 
 ### Attestation File Names
-- **SECRETAI_GPU_ATTESTATION_FILE**: Filename for GPU attestation reports (default: `gpu_attestation.txt`).
-- **SECRETAI_CPU_ATTESTATION_FILE**: Filename for CPU (TDX) attestation reports (default: `tdx_attestation.txt`).
-- **SECRETAI_SELF_ATTESTATION_FILE**: Filename for self attestation reports (default: `self_report.txt`).
+- **SECRETVM_GPU_ATTESTATION_FILE**: Filename for GPU attestation reports (default: `gpu_attestation.txt`).
+- **SECRETVM_CPU_ATTESTATION_FILE**: Filename for CPU (TDX) attestation reports (default: `tdx_attestation.txt`).
+- **SECRETVM_SELF_ATTESTATION_FILE**: Filename for self attestation reports (default: `self_report.txt`).
 
 For example, your `.env` file might look like this:
 
 ```
-SECRETAI_REPORT_DIR=reports
-SECRETAI_REST_SERVER_IP=0.0.0.0
-SECRETAI_SECURE=true
-SECRETAI_REST_SERVER_PORT=29343
-SECRETAI_CERT_PATH=cert/ssl_cert.pem
-SECRETAI_KEY_PATH=cert/ssl_key.pem
-SECRETAI_ATTEST_TOOL=attest_tool
-SECRETAI_ATTEST_TIMEOUT_SEC=10
+SECRETVM_REPORT_DIR=reports
+SECRETVM_REST_SERVER_IP=0.0.0.0
+SECRETVM_SECURE=true
+SECRETVM_REST_SERVER_PORT=29343
+SECRETVM_CERT_PATH=cert/ssl_cert.pem
+SECRETVM_KEY_PATH=cert/ssl_key.pem
+SECRETVM_ATTEST_TOOL=attest_tool
+SECRETVM_ATTEST_TIMEOUT_SEC=10
 ```
 
 ## Installation and Running
@@ -75,8 +75,8 @@ SECRETAI_ATTEST_TIMEOUT_SEC=10
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/scrtlabs/secretai-attest-rest.git
-   cd secretai-attest-rest
+   git clone https://github.com/scrtlabs/secret-vm-attest-rest-server.git
+   cd secret-vm-attest-rest-server
    ```
 
 2. **Set up your environment:**
@@ -94,8 +94,8 @@ SECRETAI_ATTEST_TIMEOUT_SEC=10
    Alternatively, build the binary:
 
    ```bash
-   go build -o secretai-attest-rest cmd/main.go
-   ./secretai-attest-rest --secure=true --port=29343 --ip=0.0.0.0
+   go build -o secret-vm-attest-rest-server cmd/main.go
+   ./secret-vm-attest-rest-server --secure=true --port=29343 --ip=0.0.0.0
    ```
 
 4. **Run tests:**

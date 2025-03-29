@@ -1,4 +1,4 @@
-module secretai-attest-rest
+module secret-vm-attest-rest-server
 
 go 1.22.0
 

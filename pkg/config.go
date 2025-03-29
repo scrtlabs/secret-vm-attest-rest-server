@@ -17,24 +17,24 @@ func init() {
 	}
 
 	// Now initialize configuration variables.
-	ReportDir = GetEnv("SECRETAI_REPORT_DIR", "reports")
-	RESTServerIP = GetEnv("SECRETAI_REST_SERVER_IP", "0.0.0.0")
-	Secure = GetBool("SECRETAI_SECURE", true)
-	Port = GetInt("SECRETAI_REST_SERVER_PORT", 29343)
+	ReportDir = GetEnv("SECRETVM_REPORT_DIR", "reports")
+	RESTServerIP = GetEnv("SECRETVM_REST_SERVER_IP", "0.0.0.0")
+	Secure = GetBool("SECRETVM_SECURE", true)
+	Port = GetInt("SECRETVM_REST_SERVER_PORT", 29343)
 
 	// Certificate paths
-	CertPath = GetEnv("SECRETAI_CERT_PATH", "cert/ssl_cert.pem")
-	KeyPath = GetEnv("SECRETAI_KEY_PATH", "cert/ssl_key.pem")
-	
+	CertPath = GetEnv("SECRETVM_CERT_PATH", "cert/ssl_cert.pem")
+	KeyPath = GetEnv("SECRETVM_KEY_PATH", "cert/ssl_key.pem")
+
 	// Attestation tool configuration
-	AttestTool = GetEnv("SECRETAI_ATTEST_TOOL", "attest_tool")
-	AttestTimeout = time.Duration(GetInt("SECRETAI_ATTEST_TIMEOUT_SEC", 10)) * time.Second
+	AttestTool = GetEnv("SECRETVM_ATTEST_TOOL", "attest_tool")
+	AttestTimeout = time.Duration(GetInt("SECRETVM_ATTEST_TIMEOUT_SEC", 10)) * time.Second
 
 	// Set names of the attestation report files - can be configured via env vars
-	GPUAttestationFile = GetEnv("SECRETAI_GPU_ATTESTATION_FILE", "gpu_attestation.txt")
-	CPUAttestationFile = GetEnv("SECRETAI_CPU_ATTESTATION_FILE", "tdx_attestation.txt")
-	SelfAttestationFile = GetEnv("SECRETAI_SELF_ATTESTATION_FILE", "self_report.txt")
-	
+	GPUAttestationFile = GetEnv("SECRETVM_GPU_ATTESTATION_FILE", "gpu_attestation.txt")
+	CPUAttestationFile = GetEnv("SECRETVM_CPU_ATTESTATION_FILE", "tdx_attestation.txt")
+	SelfAttestationFile = GetEnv("SECRETVM_SELF_ATTESTATION_FILE", "self_report.txt")
+
 	// Create report directory if it doesn't exist
 	if err := os.MkdirAll(ReportDir, 0755); err != nil {
 		log.Printf("Warning: Failed to create report directory %s: %v", ReportDir, err)
