@@ -28,9 +28,15 @@ func main() {
 
 	// Register endpoint handlers.
 	mux.HandleFunc("/status", pkg.StatusHandler)
+	// Register endpoints returning attestation text.
 	mux.HandleFunc("/gpu", pkg.MakeAttestationFileHandler(pkg.GPUAttestationFile, "GPU"))
 	mux.HandleFunc("/cpu", pkg.MakeAttestationFileHandler(pkg.CPUAttestationFile, "CPU"))
 	mux.HandleFunc("/self", pkg.MakeAttestationFileHandler(pkg.SelfAttestationFile, "Self"))
+
+	// Register endpoints returning attestation as rendered HTML.
+	mux.HandleFunc("/gpu.html", pkg.MakeAttestationHTMLHandler(pkg.GPUAttestationFile, "GPU"))
+	mux.HandleFunc("/cpu.html", pkg.MakeAttestationHTMLHandler(pkg.CPUAttestationFile, "CPU"))
+	mux.HandleFunc("/self.html", pkg.MakeAttestationHTMLHandler(pkg.SelfAttestationFile, "Self"))
 
 	// Apply middleware chain - order matters here
 	// First CORS, then security headers, and finally logging

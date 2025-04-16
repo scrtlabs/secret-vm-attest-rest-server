@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"secret-vm-attest-rest-server/pkg/html"
+	"text/template"
 	"time"
 )
 
@@ -17,10 +19,10 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
 		return
 	}
-	
+
 	response := map[string]string{
 		"status": "server is alive",
-		"time": time.Now().Format(time.RFC3339),
+		"time":   time.Now().Format(time.RFC3339),
 	}
 	respondWithJSON(w, http.StatusOK, response)
 }
@@ -40,7 +42,7 @@ func MakeAttestationFileHandler(fileName, attestationType string) http.HandlerFu
 		// Check if the file exists.
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
 			log.Printf("%s attestation file not found: %s", attestationType, filePath)
-			respondWithError(w, http.StatusNotFound, 
+			respondWithError(w, http.StatusNotFound,
 				fmt.Sprintf("%s attestation not available", attestationType),
 				fmt.Sprintf("The %s attestation data has not been generated or is not ready yet", attestationType))
 			return
@@ -61,6 +63,65 @@ func MakeAttestationFileHandler(fileName, attestationType string) http.HandlerFu
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(http.StatusOK)
 		w.Write(content)
+	}
+}
+
+// MakeAttestationHTMLHandler returns an HTTP handler that serves an HTML page for the attestation quote.
+// It reads the attestation file from the reports directory, parses the HTML template,
+// and renders the page with a dynamic title, description, and the attestation quote.
+func MakeAttestationHTMLHandler(fileName, attestationType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Allow only GET requests.
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
+			return
+		}
+
+		// Construct the full path to the attestation file.
+		filePath := filepath.Join(ReportDir, fileName)
+
+		// Check if the file exists.
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			log.Printf("%s attestation file not found: %s", attestationType, filePath)
+			respondWithError(w, http.StatusNotFound,
+				fmt.Sprintf("%s attestation not available", attestationType),
+				fmt.Sprintf("The %s attestation data has not been generated or is not ready yet", attestationType))
+			return
+		}
+
+		// Read the attestation file content.
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			log.Printf("Error reading %s attestation file: %v", attestationType, err)
+			respondWithError(w, http.StatusInternalServerError,
+				fmt.Sprintf("Failed to retrieve %s attestation data", attestationType),
+				err.Error())
+			return
+		}
+
+		// Data for the HTML template.
+		data := struct {
+			Title       string
+			Description string
+			Quote       string
+		}{
+			Title:       fmt.Sprintf("%s Attestation Quote", attestationType),
+			Description: fmt.Sprintf("Below is the %s attestation quote. Click the copy button to copy it to your clipboard.", attestationType),
+			Quote:       string(content),
+		}
+
+		// Parse and execute the HTML template.
+		tmpl, err := template.New("attestationHtml").Parse(html.HtmlTemplate)
+		if err != nil {
+			log.Printf("Error parsing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := tmpl.Execute(w, data); err != nil {
+			log.Printf("Error executing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	}
 }
 
