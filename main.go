@@ -27,6 +27,11 @@ func main() {
 	mux := http.NewServeMux()
 
 	// Register endpoint handlers.
+	
+	// Requests to /images/... map to pkg/html/images/...
+	imageDir := http.FileServer(http.Dir("pkg/html/images"))
+	mux.Handle("/images/", http.StripPrefix("/images/", imageDir))
+
 	mux.HandleFunc("/status", pkg.StatusHandler)
 	// Register endpoints returning attestation text.
 	mux.HandleFunc("/gpu", pkg.MakeAttestationFileHandler(pkg.GPUAttestationFile, "GPU"))
