@@ -2,6 +2,7 @@ package html
 
 // HtmlTemplate holds the HTML structure for attestation quote pages.
 // It includes a favicon, logo, and a copy-to-clipboard feature.
+// It conditionally renders the verification link based on .ShowVerify.
 const HtmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -174,7 +175,11 @@ const HtmlTemplate = `<!DOCTYPE html>
                 </button>
             </div>
         </div>
-        <p class="verification-link">Click <a href="#" id="verifyLink">here</a> to verify the attestation quote</p>
+        {{if .ShowVerify}}
+        <p class="verification-link">
+            Click <a href="#" id="verifyLink">here</a> to verify the attestation quote
+        </p>
+        {{end}}
     </div>
     <div class="toast" id="toast">Copied to clipboard</div>
     <script>

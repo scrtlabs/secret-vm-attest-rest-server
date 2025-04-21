@@ -99,29 +99,41 @@ func MakeAttestationHTMLHandler(fileName, attestationType string) http.HandlerFu
 			return
 		}
 
-		// Data for the HTML template.
-		data := struct {
-			Title       string
-			Description string
-			Quote       string
-		}{
-			Title:       fmt.Sprintf("%s Attestation Quote", attestationType),
-			Description: fmt.Sprintf("Below is the %s attestation quote. Click the copy button to copy it to your clipboard.", attestationType),
-			Quote:       string(content),
-		}
+        // Determine Title and Description per type (Self uses "Report")
+        var titleText, descText string
+        if attestationType == "Self" {
+            titleText = fmt.Sprintf("%s Attestation Report", attestationType)
+            descText = fmt.Sprintf("Below is the %s attestation report. Click the copy button to copy it to your clipboard.", attestationType)
+        } else {
+            titleText = fmt.Sprintf("%s Attestation Quote", attestationType)
+            descText = fmt.Sprintf("Below is the %s attestation quote. Click the copy button to copy it to your clipboard.", attestationType)
+        }
 
-		// Parse and execute the HTML template.
-		tmpl, err := template.New("attestationHtml").Parse(html.HtmlTemplate)
-		if err != nil {
-			log.Printf("Error parsing HTML template: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := tmpl.Execute(w, data); err != nil {
-			log.Printf("Error executing HTML template: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
+        // Prepare template data
+        data := struct {
+            Title       string
+            Description string
+            Quote       string
+            ShowVerify  bool
+        }{
+            Title:       titleText,
+            Description: descText,
+            Quote:       string(content),
+            ShowVerify:  attestationType == "CPU", // only CPU shows verification link
+        }
+
+        // Parse and execute HTML template
+        tmpl, err := template.New("attestationHtml").Parse(html.HtmlTemplate)
+        if err != nil {
+            log.Printf("Error parsing HTML template: %v", err)
+            http.Error(w, "Internal server error", http.StatusInternalServerError)
+            return
+        }
+        w.Header().Set("Content-Type", "text/html; charset=utf-8")
+        if err := tmpl.Execute(w, data); err != nil {
+            log.Printf("Error executing HTML template: %v", err)
+            http.Error(w, "Internal server error", http.StatusInternalServerError)
+        }
 	}
 }
 
