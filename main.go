@@ -43,6 +43,10 @@ func main() {
 	mux.HandleFunc("/cpu.html", pkg.MakeAttestationHTMLHandler(pkg.CPUAttestationFile, "CPU"))
 	mux.HandleFunc("/self.html", pkg.MakeAttestationHTMLHandler(pkg.SelfAttestationFile, "Self"))
 
+    // Docker logs endpoints
+    mux.HandleFunc("/docker_logs", pkg.MakeDockerLogsHandler())
+    mux.HandleFunc("/docker_logs.html", pkg.MakeDockerLiveLogsHandler())
+
 	// Apply middleware chain - order matters here
 	// First CORS, then security headers, and finally logging
 	handler := pkg.LoggingMiddleware(

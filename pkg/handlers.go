@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"secret-vm-attest-rest-server/pkg/html"
+	"strconv"
 	"text/template"
 	"time"
 )
@@ -99,41 +100,91 @@ func MakeAttestationHTMLHandler(fileName, attestationType string) http.HandlerFu
 			return
 		}
 
-        // Determine Title and Description per type (Self uses "Report")
-        var titleText, descText string
-        if attestationType == "Self" {
-            titleText = fmt.Sprintf("%s Attestation Report", attestationType)
-            descText = fmt.Sprintf("Below is the %s attestation report. Click the copy button to copy it to your clipboard.", attestationType)
-        } else {
-            titleText = fmt.Sprintf("%s Attestation Quote", attestationType)
-            descText = fmt.Sprintf("Below is the %s attestation quote. Click the copy button to copy it to your clipboard.", attestationType)
-        }
+		// Determine Title and Description per type (Self uses "Report")
+		var titleText, descText string
+		if attestationType == "Self" {
+			titleText = fmt.Sprintf("%s Attestation Report", attestationType)
+			descText = fmt.Sprintf("Below is the %s attestation report. Click the copy button to copy it to your clipboard.", attestationType)
+		} else {
+			titleText = fmt.Sprintf("%s Attestation Quote", attestationType)
+			descText = fmt.Sprintf("Below is the %s attestation quote. Click the copy button to copy it to your clipboard.", attestationType)
+		}
 
-        // Prepare template data
-        data := struct {
-            Title       string
-            Description string
-            Quote       string
-            ShowVerify  bool
-        }{
-            Title:       titleText,
-            Description: descText,
-            Quote:       string(content),
-            ShowVerify:  attestationType == "CPU", // only CPU shows verification link
-        }
+		// Prepare template data
+		data := struct {
+			Title       string
+			Description string
+			Quote       string
+			ShowVerify  bool
+		}{
+			Title:       titleText,
+			Description: descText,
+			Quote:       string(content),
+			ShowVerify:  attestationType == "CPU", // only CPU shows verification link
+		}
 
-        // Parse and execute HTML template
-        tmpl, err := template.New("attestationHtml").Parse(html.HtmlTemplate)
-        if err != nil {
-            log.Printf("Error parsing HTML template: %v", err)
-            http.Error(w, "Internal server error", http.StatusInternalServerError)
-            return
-        }
-        w.Header().Set("Content-Type", "text/html; charset=utf-8")
-        if err := tmpl.Execute(w, data); err != nil {
-            log.Printf("Error executing HTML template: %v", err)
-            http.Error(w, "Internal server error", http.StatusInternalServerError)
-        }
+		// Parse and execute HTML template
+		tmpl, err := template.New("attestationHtml").Parse(html.HtmlTemplate)
+		if err != nil {
+			log.Printf("Error parsing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := tmpl.Execute(w, data); err != nil {
+			log.Printf("Error executing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	}
+}
+
+// MakeDockerLogsHandler serves plain-text Docker logs,
+// supporting a 'lines' query param (default 1000).
+func MakeDockerLogsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
+			return
+		}
+		lines := 1000
+		if l := r.URL.Query().Get("lines"); l != "" {
+			if v, err := strconv.Atoi(l); err == nil {
+				lines = v
+			}
+		}
+		logs, err := fetchDockerLogs(lines)
+		if err != nil {
+			log.Printf("Error fetching Docker logs: %v", err)
+			respondWithError(w, http.StatusInternalServerError, "Failed to fetch Docker logs", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(logs))
+	}
+}
+
+// MakeDockerLiveLogsHandler serves the live-updating HTML page
+// that polls /docker_logs with a selectable line count.
+func MakeDockerLiveLogsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
+			return
+		}
+		data := struct{ Title string }{Title: "Live Docker Container Logs"}
+		tmpl, err := template.New("liveLogs").Parse(html.DockerLiveLogsTemplate)
+		if err != nil {
+			log.Printf("Error parsing live logs template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := tmpl.Execute(w, data); err != nil {
+			log.Printf("Error executing live logs template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	}
 }
 
