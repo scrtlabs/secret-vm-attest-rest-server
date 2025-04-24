@@ -7,6 +7,7 @@ SecretVM Attest REST Server is a lightweight REST server implemented in Go. It p
 - **/gpu** – Returns the NVIDIA confidential GPU attestation report.
 - **/cpu** – Returns the Intel TDX attestation report.
 - **/self** – Returns self attestation data (e.g., TDX measurement registers).
+- **/docker_logs** - Return Docker container logs as plain text (with support for line count selection).
 
 ## Features
 
@@ -21,6 +22,8 @@ SecretVM Attest REST Server is a lightweight REST server implemented in Go. It p
 - **Context Support:** Uses Go contexts for timeout and cancellation management.
 - **Method Validation:** All endpoints validate HTTP methods to ensure proper usage.
 - **Standardized Error Responses:** Consistent JSON error responses across all endpoints.
+- **Attestation Report Visualization**: Offers HTML endpoints (e.g., `/gpu.html`) that display attestation reports in a web page format. These pages are styled for readability and include an easy copy-to-clipboard option for the report content.
+- **Docker Log Monitoring**: Provides an endpoint to fetch Docker container logs and a live web interface for real-time log viewing. The web interface (`/docker_logs.html`) features a dark theme, auto-scrolling, log length selection, and copy-to-clipboard functionality.
 
 ## Project Structure
 
@@ -136,3 +139,25 @@ SECRETVM_ATTEST_TIMEOUT_SEC=10
 - **Description:** Reads the corresponding attestation file from the configured report directory and returns its content as plain text.
 - **Error Handling:**
   - Returns a JSON error if the file is missing or cannot be read.
+
+### `/gpu.html`, `/cpu.html`, `/self.html`
+
+- **Method:** GET  
+- **Description:** Renders the content of the corresponding attestation report file (GPU, CPU, or self) in a human-friendly HTML page. The page is styled for better readability and includes a copy-to-clipboard button to easily copy the report content.  
+- **Error Handling:**  
+  - If the attestation file is missing or cannot be read, an error message is displayed on the page (e.g., indicating the file could not be retrieved).
+
+### `/docker_logs`
+
+- **Method:** GET  
+- **Description:** Retrieves the latest log entries from a Docker container (intended for debugging/monitoring). By default, this endpoint targets the container named `secret-vm-docker`. If that container is not found, it will fall back to the first running container.  
+- **Query Parameters:**  
+  - `lines` (optional): The number of recent log lines to fetch. Supported values are `100`, `500`, or `1000` (defaults to `100` if not specified).  
+- **Response:** Plain text output of the requested log lines.  
+- **Error Handling:**  
+  - Returns a JSON error if the logs cannot be retrieved (for example, if no suitable container is found or an internal error occurs).
+
+### `/docker_logs.html`
+
+- **Method:** GET  
+- **Description:** Serves an interactive web interface for real-time Docker log viewing. This HTML page allows users to select the number of log lines to display (100, 500, or 1000) and automatically refreshes to show new log entries, with auto-scrolling to the latest output. The interface uses a dark theme for readability and includes a convenient copy-to-clipboard feature for the displayed logs.
