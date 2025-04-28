@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"secret-vm-attest-rest-server/pkg/html"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 )
@@ -139,25 +140,54 @@ func MakeAttestationHTMLHandler(fileName, attestationType string) http.HandlerFu
 }
 
 // MakeDockerLogsHandler serves plain-text Docker logs,
-// supporting a 'lines' query param (default 1000).
+// requiring the client to specify either a container name or an index.
 func MakeDockerLogsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Only GET allowed
 		if r.Method != http.MethodGet {
 			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
 			return
 		}
+
+		// Parse desired number of lines (default 1000)
 		lines := 1000
 		if l := r.URL.Query().Get("lines"); l != "" {
 			if v, err := strconv.Atoi(l); err == nil {
 				lines = v
 			}
 		}
-		logs, err := fetchDockerLogs(lines)
+
+		// Extract name and index parameters
+		name := r.URL.Query().Get("name")
+		idxStr := r.URL.Query().Get("index")
+		useIndex := false
+		index := 0
+		if idxStr != "" {
+			if i, err := strconv.Atoi(idxStr); err == nil {
+				index = i
+				useIndex = true
+			}
+		}
+
+		// Fetch logs, honoring error if neither selector nor valid container
+		logs, err := fetchDockerLogsWithSelector(name, index, useIndex, lines)
 		if err != nil {
 			log.Printf("Error fetching Docker logs: %v", err)
-			respondWithError(w, http.StatusInternalServerError, "Failed to fetch Docker logs", err.Error())
+			// Bad request if no selector at all
+			if name == "" && !useIndex {
+				respondWithError(w, http.StatusBadRequest, "Name or index required", "Please specify a container name or index")
+				return
+			}
+			// Not found if selector provided but no match
+			if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "out of range") {
+				respondWithError(w, http.StatusNotFound, "No container found", err.Error())
+			} else {
+				respondWithError(w, http.StatusInternalServerError, "Failed to fetch Docker logs", err.Error())
+			}
 			return
 		}
+
+		// Return logs as plain text
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(http.StatusOK)

@@ -7,7 +7,10 @@ SecretVM Attest REST Server is a lightweight REST server implemented in Go. It p
 - **/gpu** – Returns the NVIDIA confidential GPU attestation report.
 - **/cpu** – Returns the Intel TDX attestation report.
 - **/self** – Returns self attestation data (e.g., TDX measurement registers).
-- **/docker_logs** - Return Docker container logs as plain text (with support for line count selection).
+- **/docker_logs** – Return Docker container logs as plain text. **Requires** exactly one of:
+  - `name` (container name), or  
+  - `index` (zero-based container index).  
+  Optional `lines` parameter (100, 500, 1000; default 1000).
 
 ## Features
 
@@ -151,13 +154,22 @@ SECRETVM_ATTEST_TIMEOUT_SEC=10
 
 - **Method:** GET  
 - **Description:** Retrieves the latest log entries from a Docker container (intended for debugging/monitoring). By default, this endpoint targets the container named `secret-vm-docker`. If that container is not found, it will fall back to the first running container.  
-- **Query Parameters:**  
-  - `lines` (optional): The number of recent log lines to fetch. Supported values are `100`, `500`, or `1000` (defaults to `100` if not specified).  
+- **Query Parameters:**
+  - `name` (string) – exact container name (takes priority over `index`)
+  - `index` (integer) – zero-based index into the `docker ps` list
+  - `lines` (optional) – number of lines to fetch (100, 500, 1000; default 1000)
 - **Response:** Plain text output of the requested log lines.  
-- **Error Handling:**  
-  - Returns a JSON error if the logs cannot be retrieved (for example, if no suitable container is found or an internal error occurs).
+**Error Handling:**  
+  - **400 Bad Request** if neither `name` nor `index` is provided.  
+  - **404 Not Found** if no running container matches the specified `name` or `index`.  
 
 ### `/docker_logs.html`
 
 - **Method:** GET  
-- **Description:** Serves an interactive web interface for real-time Docker log viewing. This HTML page allows users to select the number of log lines to display (100, 500, or 1000) and automatically refreshes to show new log entries, with auto-scrolling to the latest output. The interface uses a dark theme for readability and includes a convenient copy-to-clipboard feature for the displayed logs.
+**Description:**  
+  - A radio selector lets you choose exactly one mode: **By Name** or **By Index**.  
+  - Enter the container name or index, then click **Apply**.  
+  - After **Apply**, the page will auto-refresh the logs every 2 seconds, **only** if the log view is scrolled to the bottom.  
+  - The **Copy Logs** button copies the currently displayed logs to your clipboard.  
+  - If the container isn’t found or the input field is left empty, the interface displays the full error message returned by the server.
+
