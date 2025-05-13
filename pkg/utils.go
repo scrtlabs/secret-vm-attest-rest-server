@@ -8,6 +8,18 @@ import (
 	"strings"
 )
 
+// fetchServiceLogs retrieves logs from secret-vm-* systemd services
+func fetchServicesLogs() (string, error) {
+	var buf bytes.Buffer
+	cmd := exec.Command("journalctl", "-u", "secret-vm-network-setup", "-u", "secret-vm-startup", "-u", "secret-vm-attest-rest", "-u", "secret-vm-docker-start")
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
 // fetchDockerLogsWithSelector retrieves logs from a container based on
 // a provided name or numeric index. If name is non-empty, it tries to find
 // a container with exactly that name and errors if none found. If useIndex is true,

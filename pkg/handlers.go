@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"secret-vm-attest-rest-server/pkg/html"
 	"strconv"
-	"strings"
 	"text/template"
 	"time"
 )
@@ -170,21 +169,14 @@ func MakeDockerLogsHandler() http.HandlerFunc {
 		}
 
 		// Fetch logs, honoring error if neither selector nor valid container
-		logs, err := fetchDockerLogsWithSelector(name, index, useIndex, lines)
+		logs, err := fetchServicesLogs()
+		if err != nil {
+			log.Printf("Error fetching system logs: %v", err)
+		}
+		out, err := fetchDockerLogsWithSelector(name, index, useIndex, lines)
+		logs += out
 		if err != nil {
 			log.Printf("Error fetching Docker logs: %v", err)
-			// Bad request if no selector at all
-			if name == "" && !useIndex {
-				respondWithError(w, http.StatusBadRequest, "Name or index required", "Please specify a container name or index")
-				return
-			}
-			// Not found if selector provided but no match
-			if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "out of range") {
-				respondWithError(w, http.StatusNotFound, "No container found", err.Error())
-			} else {
-				respondWithError(w, http.StatusInternalServerError, "Failed to fetch Docker logs", err.Error())
-			}
-			return
 		}
 
 		// Return logs as plain text
