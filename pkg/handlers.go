@@ -140,7 +140,7 @@ func MakeAttestationHTMLHandler(fileName, attestationType string) http.HandlerFu
 
 // MakeVMLogsHandler serves plain-text VM logs (including docker logs),
 // requiring the client to specify either a container name or an index.
-func MakeVMLogsHandler() http.HandlerFunc {
+func MakeVMLogsHandler(secure bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Only GET allowed
 		if r.Method != http.MethodGet {
@@ -173,10 +173,14 @@ func MakeVMLogsHandler() http.HandlerFunc {
 		if err != nil {
 			log.Printf("Error fetching system logs: %v", err)
 		}
-		out, err := fetchDockerLogsWithSelector(name, index, useIndex, lines)
-		logs += out
-		if err != nil {
-			log.Printf("Error fetching Docker logs: %v", err)
+		if secure {
+			// fetch docker logs only in https mode, because during http mode
+			// the docker is still configuring
+			out, err := fetchDockerLogsWithSelector(name, index, useIndex, lines)
+			if err != nil {
+				log.Printf("Error fetching Docker logs: %v", err)
+			}
+			logs += out
 		}
 
 		// Return logs as plain text

@@ -44,7 +44,7 @@ func main() {
 	mux.HandleFunc("/self.html", pkg.MakeAttestationHTMLHandler(pkg.SelfAttestationFile, "Self"))
 
 	// VM logs endpoints
-	mux.HandleFunc("/logs", pkg.MakeVMLogsHandler())
+	mux.HandleFunc("/logs", pkg.MakeVMLogsHandler(*secure))
 	mux.HandleFunc("/logs.html", pkg.MakeVMLiveLogsHandler())
 
 	// Apply middleware chain - order matters here
