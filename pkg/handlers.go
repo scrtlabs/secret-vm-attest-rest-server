@@ -138,9 +138,9 @@ func MakeAttestationHTMLHandler(fileName, attestationType string) http.HandlerFu
 	}
 }
 
-// MakeDockerLogsHandler serves plain-text Docker logs,
+// MakeVMLogsHandler serves plain-text VM logs (including docker logs),
 // requiring the client to specify either a container name or an index.
-func MakeDockerLogsHandler() http.HandlerFunc {
+func MakeVMLogsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Only GET allowed
 		if r.Method != http.MethodGet {
@@ -187,9 +187,9 @@ func MakeDockerLogsHandler() http.HandlerFunc {
 	}
 }
 
-// MakeDockerLiveLogsHandler serves the live-updating HTML page
-// that polls /docker_logs with a selectable line count.
-func MakeDockerLiveLogsHandler() http.HandlerFunc {
+// MakeVMLiveLogsHandler serves the live-updating HTML page
+// that polls /logs with a selectable line count.
+func MakeVMLiveLogsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")

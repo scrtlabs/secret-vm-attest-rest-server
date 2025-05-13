@@ -27,7 +27,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	// Register endpoint handlers.
-	
+
 	// Requests to /images/... map to pkg/html/images/...
 	imageDir := http.FileServer(http.Dir("pkg/html/images"))
 	mux.Handle("/images/", http.StripPrefix("/images/", imageDir))
@@ -43,9 +43,9 @@ func main() {
 	mux.HandleFunc("/cpu.html", pkg.MakeAttestationHTMLHandler(pkg.CPUAttestationFile, "CPU"))
 	mux.HandleFunc("/self.html", pkg.MakeAttestationHTMLHandler(pkg.SelfAttestationFile, "Self"))
 
-    // Docker logs endpoints
-    mux.HandleFunc("/docker_logs", pkg.MakeDockerLogsHandler())
-    mux.HandleFunc("/docker_logs.html", pkg.MakeDockerLiveLogsHandler())
+	// VM logs endpoints
+	mux.HandleFunc("/logs", pkg.MakeVMLogsHandler())
+	mux.HandleFunc("/logs.html", pkg.MakeVMLiveLogsHandler())
 
 	// Apply middleware chain - order matters here
 	// First CORS, then security headers, and finally logging
