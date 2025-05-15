@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"embed"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +14,11 @@ import (
 	"syscall"
 	"time"
 )
+
+// 1. Embed everything under pkg/html/images/
+//
+//go:embed pkg/html/images/*
+var embeddedImages embed.FS
 
 func main() {
 	// Define command-line flags with default values coming from pkg.
@@ -28,8 +35,14 @@ func main() {
 
 	// Register endpoint handlers.
 
-	// Requests to /images/... map to pkg/html/images/...
-	imageDir := http.FileServer(http.Dir("pkg/html/images"))
+	// carve out a sub-FS whose root is pkg/html/images
+	imagesSub, err := fs.Sub(embeddedImages, "pkg/html/images")
+	if err != nil {
+		log.Fatalf("failed to create sub FS for images: %v", err)
+	}
+
+	// now imagesSub has "favicon.png", etc. at its root
+	imageDir := http.FileServer(http.FS(imagesSub))
 	mux.Handle("/images/", http.StripPrefix("/images/", imageDir))
 
 	mux.HandleFunc("/status", pkg.StatusHandler)
