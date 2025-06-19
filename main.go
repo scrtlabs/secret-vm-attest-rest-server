@@ -60,6 +60,14 @@ func main() {
 	mux.HandleFunc("/logs", pkg.MakeVMLogsHandler(*secure))
 	mux.HandleFunc("/logs.html", pkg.MakeVMLiveLogsHandler())
 
+    // New endpoints for docker-compose
+    mux.HandleFunc("/docker-compose",      pkg.MakeDockerComposeFileHandler())
+    mux.HandleFunc("/docker-compose.html", pkg.MakeDockerComposeHTMLHandler())
+
+	// New endpoints for resources
+	mux.HandleFunc("/resources",      pkg.MakeResourcesHandler())
+	mux.HandleFunc("/resources.html", pkg.MakeResourcesHTMLHandler())
+
 	// Apply middleware chain - order matters here
 	// First CORS, then security headers, and finally logging
 	handler := pkg.LoggingMiddleware(

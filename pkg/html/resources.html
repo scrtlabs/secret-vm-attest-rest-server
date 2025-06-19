@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Live System Resources</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- Tailwind via the official Play CDN -->
+  <script src="https://cdn.tailwindcss.com"></script> <!-- :contentReference[oaicite:0]{index=0} -->
+  <!-- Chart.js UMD build from jsDelivr (replace 4.4.1 with the version you need) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script> <!-- :contentReference[oaicite:1]{index=1} -->
+  <!-- Add favicon for browser tab -->
+  <link rel="icon" href="/images/favicon.png" type="image/png">
+</head>
+<body class="bg-gray-900 text-gray-100">
+  <header class="p-6 text-center">
+    <h1 class="text-3xl font-semibold">System Resource Dashboard</h1>
+    <p class="text-gray-400 mt-1">Real-time CPU, Memory, and Disk usage</p>
+  </header>
+  <main class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+    <div class="bg-gray-800 shadow-md rounded-lg p-4 flex flex-col items-center">
+      <h2 class="text-xl mb-2">CPU Usage</h2>
+      <canvas id="cpuChart" class="w-32 h-32"></canvas>
+      <p id="cpuText" class="mt-2 text-lg font-medium"></p>
+    </div>
+    <div class="bg-gray-800 shadow-md rounded-lg p-4 flex flex-col items-center">
+      <h2 class="text-xl mb-2">Memory Usage</h2>
+      <canvas id="memChart" class="w-32 h-32"></canvas>
+      <p id="memText" class="mt-2 text-lg font-medium"></p>
+    </div>
+    <div class="bg-gray-800 shadow-md rounded-lg p-4 flex flex-col items-center">
+      <h2 class="text-xl mb-2">Disk Usage</h2>
+      <canvas id="diskChart" class="w-32 h-32"></canvas>
+      <p id="diskText" class="mt-2 text-lg font-medium"></p>
+    </div>
+  </main>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const makeChart = (ctx, label, unit) => new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: [label, 'Free ' + unit],
+          datasets: [{ data: [0,100], backgroundColor: ['#70a9ff','#333'], hoverOffset:4 }]
+        },
+        options: { responsive:true, cutout:'70%', plugins:{ title:{display:true,text:label} } }
+      });
+
+      const cpuChart  = makeChart(document.getElementById('cpuChart').getContext('2d'), 'CPU %', '%');
+      const memChart  = makeChart(document.getElementById('memChart').getContext('2d'), 'Memory GB', ' GB');
+      const diskChart = makeChart(document.getElementById('diskChart').getContext('2d'), 'Disk GB', ' GB');
+
+      async function updateCharts() {
+        try {
+          const stats = await (await fetch('/resources')).json();
+          cpuChart.data.datasets[0].data = [stats.cpu_percent, 100 - stats.cpu_percent];
+          cpuChart.update();
+          document.getElementById('cpuText').textContent = stats.cpu_percent.toFixed(1) + '%';
+
+          const mu = parseFloat(stats.memory_used_gb), mt = parseFloat(stats.memory_total_gb);
+          memChart.data.datasets[0].data = [mu, mt - mu];
+          memChart.update();
+          document.getElementById('memText').textContent = `${stats.memory_used_gb} / ${stats.memory_total_gb}`;
+
+          const du = parseFloat(stats.disk_used_gb), dt = parseFloat(stats.disk_total_gb);
+          diskChart.data.datasets[0].data = [du, dt - du];
+          diskChart.update();
+          document.getElementById('diskText').textContent = `${stats.disk_used_gb} / ${stats.disk_total_gb}`;
+        } catch (e) {
+          console.error('updateCharts()', e);
+        }
+      }
+
+      updateCharts();
+      setInterval(updateCharts, 2000);
+    });
+  </script>
+</body>
+</html>

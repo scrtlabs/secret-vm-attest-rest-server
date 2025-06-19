@@ -82,3 +82,20 @@ func getContainerLogs(containerID, linesArg string) (string, error) {
 	}
 	return buf.String(), nil
 }
+
+// formatBytes converts bytes to a human-readable string in B, kB, MB, GB, etc.
+func formatBytes(b uint64) string {
+    const base = 1024.0
+    sizes := []string{"B", "kB", "MB", "GB", "TB", "PB"}
+    f := float64(b)
+    i := 0
+    for f >= base && i < len(sizes)-1 {
+        f /= base
+        i++
+    }
+    // show two decimals for MB and above
+    if i > 1 {
+        return fmt.Sprintf("%.2f %s", f, sizes[i])
+    }
+    return fmt.Sprintf("%.0f %s", f, sizes[i])
+}

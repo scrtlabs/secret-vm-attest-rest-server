@@ -35,6 +35,9 @@ func init() {
 	CPUAttestationFile = GetEnv("SECRETVM_CPU_ATTESTATION_FILE", "tdx_attestation.txt")
 	SelfAttestationFile = GetEnv("SECRETVM_SELF_ATTESTATION_FILE", "self_report.txt")
 
+    // Path to docker-compose file (must be set in env).
+    DockerComposePath = GetEnv("SECRETVM_DOCKER_COMPOSE_PATH", "docker_compose.yaml")
+
 	// Create report directory if it doesn't exist
 	if err := os.MkdirAll(ReportDir, 0755); err != nil {
 		log.Printf("Warning: Failed to create report directory %s: %v", ReportDir, err)
@@ -89,4 +92,7 @@ var (
 	GPUAttestationFile  string
 	CPUAttestationFile  string
 	SelfAttestationFile string
+
+	// Path to docker-compose file
+	DockerComposePath string
 )

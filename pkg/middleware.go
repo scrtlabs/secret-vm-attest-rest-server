@@ -24,21 +24,21 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Start timer
 		start := time.Now()
-		
+
 		// Create a wrapper for the response writer to capture the status code
 		wrapped := &ResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-		
+
 		// Process the request
 		next.ServeHTTP(wrapped, r)
-		
+
 		// Calculate request processing time
 		duration := time.Since(start)
-		
+
 		// Log the request details including status code and duration
-		log.Printf("%s | %s %s | %d | %s | %v", 
-			r.RemoteAddr, 
-			r.Method, 
-			r.URL.String(), 
+		log.Printf("%s | %s %s | %d | %s | %v",
+			r.RemoteAddr,
+			r.Method,
+			r.URL.String(),
 			wrapped.statusCode,
 			http.StatusText(wrapped.statusCode),
 			duration)
@@ -53,9 +53,14 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-		// Allow inline scripts and inline styles so that the copy button can work properly.
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
-		
+		// Allow Tailwind Play CDN, Chart.js, inline scripts/styles, and Chart.js eval
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; "+
+				"style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; "+
+				"connect-src 'self';",
+		)
+
 		// Call the next handler
 		next.ServeHTTP(w, r)
 	})
@@ -68,13 +73,13 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		
+
 		// Handle preflight requests
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		
+
 		// Call the next handler
 		next.ServeHTTP(w, r)
 	})
