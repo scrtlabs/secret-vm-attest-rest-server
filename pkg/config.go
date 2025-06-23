@@ -38,6 +38,9 @@ func init() {
     // Path to docker-compose file (must be set in env).
     DockerComposePath = GetEnv("SECRETVM_DOCKER_COMPOSE_PATH", "docker_compose.yaml")
 
+	// Path to filesystem mount point
+	FsMountPath = GetEnv("SECRETVM_FS_MOUNT_PATH", "/mnt/secure")
+
 	// Create report directory if it doesn't exist
 	if err := os.MkdirAll(ReportDir, 0755); err != nil {
 		log.Printf("Warning: Failed to create report directory %s: %v", ReportDir, err)
@@ -95,4 +98,7 @@ var (
 
 	// Path to docker-compose file
 	DockerComposePath string
+
+	// Filesystem mount path
+	FsMountPath string
 )

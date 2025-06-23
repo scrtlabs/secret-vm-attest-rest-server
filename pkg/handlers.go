@@ -249,7 +249,7 @@ func MakeResourcesHandler() http.HandlerFunc {
 		vm, _ := mem.VirtualMemory() // Total and Used in bytes :contentReference[oaicite:4]{index=4}
 
 		// Disk stats for root
-		du, _ := disk.Usage("/") // Total and Used in bytes :contentReference[oaicite:5]{index=5}
+		du, _ := disk.Usage(FsMountPath) // Total and Used in bytes :contentReference[oaicite:5]{index=5}
 
 		// CPU percent
 		cpus, _ := cpu.Percent(2000*time.Millisecond, false)
