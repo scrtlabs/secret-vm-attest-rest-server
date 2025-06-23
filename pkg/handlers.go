@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -225,12 +226,12 @@ func MakeDockerComposeHTMLHandler() http.HandlerFunc {
 	}
 }
 
-// ResourceStats holds both raw percentages and human-readable sizes.
+// ResourceStats holds both raw percentages and GB values as numbers.
 type ResourceStats struct {
-	MemoryUsedGB  string  `json:"memory_used_gb"`
-	MemoryTotalGB string  `json:"memory_total_gb"`
-	DiskUsedGB    string  `json:"disk_used_gb"`
-	DiskTotalGB   string  `json:"disk_total_gb"`
+	MemoryUsedGB  float64 `json:"memory_used_gb"`
+	MemoryTotalGB float64 `json:"memory_total_gb"`
+	DiskUsedGB    float64 `json:"disk_used_gb"`
+	DiskTotalGB   float64 `json:"disk_total_gb"`
 	MemoryPercent float64 `json:"memory_percent"`
 	DiskPercent   float64 `json:"disk_percent"`
 	CPUPercent    float64 `json:"cpu_percent"`
@@ -254,11 +255,17 @@ func MakeResourcesHandler() http.HandlerFunc {
 		cpus, _ := cpu.Percent(2000*time.Millisecond, false)
 		cpuPct := cpus[0] // aggregate CPU usage :contentReference[oaicite:6]{index=6}
 
+		// Convert bytes → GB and round to 3 decimal places
+		toGB := func(b uint64) float64 {
+			gb := float64(b) / (1024 * 1024 * 1024)
+			return math.Round(gb*1000) / 1000
+		}
+
 		stats := ResourceStats{
-			MemoryUsedGB:  formatBytes(vm.Used),
-			MemoryTotalGB: formatBytes(vm.Total),
-			DiskUsedGB:    formatBytes(du.Used),
-			DiskTotalGB:   formatBytes(du.Total),
+			MemoryUsedGB:  toGB(vm.Used),
+			MemoryTotalGB: toGB(vm.Total),
+			DiskUsedGB:    toGB(du.Used),
+			DiskTotalGB:   toGB(du.Total),
 			MemoryPercent: vm.UsedPercent,
 			DiskPercent:   du.UsedPercent,
 			CPUPercent:    cpuPct,
