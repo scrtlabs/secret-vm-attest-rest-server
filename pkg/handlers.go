@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"secret-vm-attest-rest-server/pkg/html"
 	"strconv"
@@ -293,6 +295,81 @@ func MakeResourcesHTMLHandler() http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := resourcesTmpl.ExecuteTemplate(w, "resources.html", nil); err != nil {
+			log.Printf("template execute error: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	}
+}
+
+// MakeVMUpdatesHandler serves raw JSON at /vm_updates
+func MakeVMUpdatesHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed,
+				"Method not allowed", "Only GET requests are supported")
+			return
+		}
+
+		// Read VM config
+		data, err := os.ReadFile(VmConfigPath)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError,
+				"Cannot read VM config", err.Error())
+			return
+		}
+		var cfg struct {
+			ServiceID string `json:"service_id"`
+		}
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			respondWithError(w, http.StatusInternalServerError,
+				"Invalid VM config format", err.Error())
+			return
+		}
+
+		if cfg.ServiceID == "" {
+			respondWithJSON(w, http.StatusOK, map[string]string{
+				"error": "VM is not upgradeable",
+			})
+			return
+		}
+
+		// Call external kms-query binary
+		cmd := exec.Command("kms-query", "list_image_filters", cfg.ServiceID)
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &out
+
+		if err := cmd.Run(); err != nil {
+			respondWithError(w, http.StatusInternalServerError,
+				"failed to query contract", err.Error()+": "+out.String())
+			return
+		}
+
+		// Validate JSON
+		var js json.RawMessage
+		if err := json.Unmarshal(out.Bytes(), &js); err != nil {
+			respondWithError(w, http.StatusInternalServerError,
+				"invalid JSON from kms-query", err.Error())
+			return
+		}
+
+		// Return as-is
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(out.Bytes())
+	}
+}
+
+// MakeVMUpdatesHTMLHandler serves the page at /vm_updates.html
+func MakeVMUpdatesHTMLHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed,
+				"Method not allowed", "Only GET requests are supported")
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := html.VMUpdatesTmpl.ExecuteTemplate(w, "vm_updates.html", nil); err != nil {
 			log.Printf("template execute error: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}

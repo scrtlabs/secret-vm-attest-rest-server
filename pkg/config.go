@@ -35,8 +35,11 @@ func init() {
 	CPUAttestationFile = GetEnv("SECRETVM_CPU_ATTESTATION_FILE", "tdx_attestation.txt")
 	SelfAttestationFile = GetEnv("SECRETVM_SELF_ATTESTATION_FILE", "self_report.txt")
 
-    // Path to docker-compose file (must be set in env).
-    DockerComposePath = GetEnv("SECRETVM_DOCKER_COMPOSE_PATH", "docker_compose.yaml")
+	// Path to docker-compose file (must be set in env).
+	DockerComposePath = GetEnv("SECRETVM_DOCKER_COMPOSE_PATH", "docker_compose.yaml")
+	
+	// Path to vm config file (must be set in env).
+	VmConfigPath = GetEnv("SECRETVM_CONFIG_PATH", "/mnt/config/secret-vm.json")
 
 	// Path to filesystem mount point
 	FsMountPath = GetEnv("SECRETVM_FS_MOUNT_PATH", "/mnt/secure")
@@ -98,6 +101,7 @@ var (
 
 	// Path to docker-compose file
 	DockerComposePath string
+	VmConfigPath      string
 
 	// Filesystem mount path
 	FsMountPath string

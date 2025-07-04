@@ -1,0 +1,82 @@
+<!-- pkg/html/vm_updates.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>VM Images</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="/images/favicon.png" type="image/png">
+</head>
+<body class="bg-gray-900 text-gray-100">
+  <main class="max-w-3xl mx-auto p-6 space-y-6">
+    <h1 class="text-4xl font-bold text-center">VM Images</h1>
+    <div id="message" class="text-center text-red-400"></div>
+    <div id="images" class="flex flex-col space-y-6"></div>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const resp = await fetch('/vm_updates');
+      const data = await resp.json();
+      const msgEl = document.getElementById('message');
+      const imagesEl = document.getElementById('images');
+
+      if (data.error) {
+        msgEl.textContent = data.error;
+        return;
+      }
+
+      data.filters.forEach(entry => {
+        const filter = entry.filter;
+        const keys = Object.keys(filter).filter(k => filter[k] != null);
+        if (!keys.length) return;
+
+        // Card container
+        const card = document.createElement('div');
+        card.className = `
+          bg-gray-800 rounded-lg shadow-md 
+          overflow-hidden flex flex-col
+        `;
+
+        // Image header
+        const imgHeader = document.createElement('div');
+        imgHeader.className = 'bg-gray-700 px-4 py-2';
+        imgHeader.innerHTML = '<h2 class="text-xl font-semibold">Image</h2>';
+        card.appendChild(imgHeader);
+
+        // Image details with wrapping
+        const imgBody = document.createElement('div');
+        imgBody.className = 'px-4 py-4 space-y-2 bg-gray-800';
+        keys.forEach(key => {
+          const row = document.createElement('div');
+          row.className = 'flex flex-col';
+          const label = document.createElement('span');
+          label.className = 'font-medium text-gray-300 truncate';
+          label.textContent = key;
+          const value = document.createElement('span');
+          value.className = 'text-gray-100 break-words';  // allow wrapping
+          value.textContent = filter[key];
+          row.append(label, value);
+          imgBody.appendChild(row);
+        });
+        card.appendChild(imgBody);
+
+        // Description header
+        const descHeader = document.createElement('div');
+        descHeader.className = 'bg-gray-700 px-4 py-2 border-t border-gray-600';
+        descHeader.innerHTML = '<h2 class="text-xl font-semibold">Description</h2>';
+        card.appendChild(descHeader);
+
+        // Description body, auto-expand
+        const descBody = document.createElement('div');
+        descBody.className = 'px-4 py-4 bg-gray-800 text-gray-200 italic break-words';
+        descBody.textContent = entry.description;
+        card.appendChild(descBody);
+
+        imagesEl.appendChild(card);
+      });
+    });
+  </script>
+</body>
+</html>
