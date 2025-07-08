@@ -173,3 +173,72 @@ SECRETVM_ATTEST_TIMEOUT_SEC=10
   - The **Copy Logs** button copies the currently displayed logs to your clipboard.  
   - If the container isn’t found or the input field is left empty, the interface displays the full error message returned by the server.
 
+
+
+### `/resources` & `/resources.html`
+
+#### `/resources`
+- **Method:** `GET`  
+- **Description:** Returns current system resource usage as JSON:
+  - `memory_used_gb` / `memory_total_gb` (numeric, three‐decimal precision)  
+  - `disk_used_gb` / `disk_total_gb` (numeric, three‐decimal precision)  
+  - `memory_percent`, `disk_percent`, `cpu_percent` (float)  
+- **Response Example:**
+  ```json
+  {
+    "memory_used_gb": 1.234,
+    "memory_total_gb": 8.000,
+    "disk_used_gb": 12.345,
+    "disk_total_gb": 100.000,
+    "memory_percent": 15.425,
+    "disk_percent": 12.345,
+    "cpu_percent": 4.500
+  }
+  ```
+#### `/resources.html`
+
+* **Method:** `GET`
+* **Description:** Renders a live dashboard of CPU, memory, and disk usage with animated doughnut charts, refreshing every 2 seconds. Styled with Tailwind CSS and Chart.js for an interactive experience.
+
+### `/vm_updates` & `/vm_updates.html`
+
+#### `/vm_updates`
+
+* **Method:** `GET`
+* **Description:** If the VM’s `service_id` is missing in the config, returns:
+
+  ```json
+  { "error": "VM is not upgradeable" }
+  ```
+
+  Otherwise calls the `kms-query list_image_filters <service_id>` CLI and returns its JSON result:
+
+  ```json
+  {
+    "filters": [
+      {
+        "filter": { "mr_td": "...", /* other non-null fields */ },
+        "description": "test description"
+      },
+      …
+    ]
+  }
+  ```
+
+#### `/vm_updates.html`
+
+* **Method:** `GET`
+* **Description:** Displays each image filter and its description in clearly-labeled cards (“Image” section & “Description” section), stacked vertically and styled to match the rest of the site.
+
+### `/docker-compose` & `/docker-compose.html`
+
+#### `/docker-compose`
+
+* **Method:** `GET`
+* **Description:** Returns the raw `docker-compose.yaml` (path set by `SECRETVM_DOCKER_COMPOSE_PATH`) as plain text.
+
+#### `/docker-compose.html`
+
+* **Method:** `GET`
+* **Description:** Renders the same `docker-compose.yaml` content inside your standard copy-to-clipboard HTML template, complete with your site’s dark theme and copy button for easy sharing.
+
