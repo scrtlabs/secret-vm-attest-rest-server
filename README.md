@@ -11,6 +11,7 @@ SecretVM Attest REST Server is a lightweight REST server implemented in Go. It p
   - `name` (container name), or  
   - `index` (zero-based container index).  
   Optional `lines` parameter (100, 500, 1000; default 1000).
+- **/vm_updates** - Returns the upgrade history of the VM (or "VM is not upgradeable")
 
 ## Features
 
