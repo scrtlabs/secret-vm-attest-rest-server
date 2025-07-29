@@ -2,15 +2,26 @@
 
 SecretVM Attest REST Server is a lightweight REST server implemented in Go. It provides attestation reports for confidential virtual machines (VMs) over HTTPS. The server exposes multiple endpoints to return different attestation reports, including:
 
-- **/status** – Returns the server status.
-- **/attestation** – Executes an internal process (e.g., `attest_tool`) and returns a JSON attestation report.
-- **/gpu** – Returns the NVIDIA confidential GPU attestation report.
-- **/cpu** – Returns the Intel TDX attestation report.
-- **/self** – Returns self attestation data (e.g., TDX measurement registers).
-- **/logs** – Return VM logs as plain text. **Requires** exactly one of:
-  - `name` (container name), or  
-  - `index` (zero-based container index).  
-  Optional `lines` parameter (100, 500, 1000; default 1000).
+## Available Endpoints
+
+| Endpoint               | Method | Description                                                                                                 |
+| ---------------------- | ------ | ----------------------------------------------------------------------------------------------------------- |
+| `/status`              | GET    | Returns a JSON object indicating that the server is alive.                                                  |
+| `/attestation`         | GET    | Executes the configured attestation tool and returns a JSON attestation report.                             |
+| `/gpu`                 | GET    | Returns the NVIDIA confidential GPU attestation report as plain text.                                       |
+| `/cpu`                 | GET    | Returns the Intel TDX attestation report as plain text.                                                     |
+| `/self`                | GET    | Returns self attestation data (e.g., TDX measurement registers) as plain text.                              |
+| `/gpu.html`            | GET    | Renders the GPU attestation report in a styled HTML page with copy-to-clipboard.                            |
+| `/cpu.html`            | GET    | Renders the CPU attestation report in a styled HTML page with copy-to-clipboard.                            |
+| `/self.html`           | GET    | Renders the self attestation report in a styled HTML page with copy-to-clipboard.                           |
+| `/logs`                | GET    | Retrieves VM logs (plain text). Requires exactly one of `name` or `index`. Default `lines=1000`.            |
+| `/logs.html`           | GET    | Live web interface for real-time log viewing with dark theme, auto-scroll, and copy-to-clipboard.           |
+| `/docker-compose`      | GET    | Returns the raw `docker-compose.yaml` as plain text.                                                        |
+| `/docker-compose.html` | GET    | Renders the `docker-compose.yaml` in an HTML template with copy-to-clipboard.                               |
+| `/resources`           | GET    | Returns current system resource usage as JSON (memory, disk, CPU).                                          |
+| `/resources.html`      | GET    | Live dashboard of CPU, memory, and disk usage with animated charts.                                         |
+| `/vm_updates`          | GET    | Returns the upgrade history of the VM (or "VM is not upgradeable") . |
+| `/vm_updates.html`     | GET    | Displays image upgrade filters and descriptions in styled HTML cards.                                               |
 
 ## Features
 
