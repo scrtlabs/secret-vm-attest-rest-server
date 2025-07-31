@@ -27,7 +27,7 @@ func fetchServicesLogs() (string, error) {
 // If neither name nor index is provided, it falls back to the first running container.
 func fetchDockerLogsWithSelector(name string, index int, useIndex bool, lines int) (string, error) {
 	// List running containers as "<ID> <Name>\n"
-	out, err := exec.Command("docker", "ps", "--format", "{{.ID}} {{.Names}}").Output()
+	out, err := exec.Command("docker", "ps", "-a", "--format", "{{.ID}} {{.Names}}").Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to list Docker containers: %w", err)
 	}
@@ -85,17 +85,18 @@ func getContainerLogs(containerID, linesArg string) (string, error) {
 
 // formatBytes converts bytes to a human-readable string in B, kB, MB, GB, etc.
 func formatBytes(b uint64) string {
-    const base = 1024.0
-    sizes := []string{"B", "kB", "MB", "GB", "TB", "PB"}
-    f := float64(b)
-    i := 0
-    for f >= base && i < len(sizes)-1 {
-        f /= base
-        i++
-    }
-    // show two decimals for MB and above
-    if i > 1 {
-        return fmt.Sprintf("%.2f %s", f, sizes[i])
-    }
-    return fmt.Sprintf("%.0f %s", f, sizes[i])
+	const base = 1024.0
+	sizes := []string{"B", "kB", "MB", "GB", "TB", "PB"}
+	f := float64(b)
+	i := 0
+	for f >= base && i < len(sizes)-1 {
+		f /= base
+		i++
+	}
+	// show two decimals for MB and above
+	if i > 1 {
+		return fmt.Sprintf("%.2f %s", f, sizes[i])
+	}
+	return fmt.Sprintf("%.0f %s", f, sizes[i])
 }
+
