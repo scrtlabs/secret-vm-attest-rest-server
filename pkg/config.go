@@ -44,6 +44,11 @@ func init() {
 	// Path to filesystem mount point
 	FsMountPath = GetEnv("SECRETVM_FS_MOUNT_PATH", "/mnt/secure")
 
+	SystemInfoPath = GetEnv("SECRETVM_SYSTEM_INFO_PATH", "/mnt/secure/system_info.json")
+	
+	PublicKeyEd25519Path = GetEnv("SECRETVM_PUBLIC_KEY_ED25519", "/mnt/secure/docker_wd/crypto/docker_public_key_ed25519.pem")
+	PublicKeySecp256k1Path = GetEnv("SECRETVM_PUBLIC_KEY_SECP256K1", "/mnt/secure/docker_wd/crypto/docker_public_key_secp256k1.pem")
+
 	// Create report directory if it doesn't exist
 	if err := os.MkdirAll(ReportDir, 0755); err != nil {
 		log.Printf("Warning: Failed to create report directory %s: %v", ReportDir, err)
@@ -105,4 +110,9 @@ var (
 
 	// Filesystem mount path
 	FsMountPath string
+
+	SystemInfoPath string // Path to system_info.json
+
+	PublicKeyEd25519Path  string
+    PublicKeySecp256k1Path string
 )

@@ -29,9 +29,24 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Default env value
+	env := "unknown"
+
+	// Try to read system_info.json if available
+	data, err := os.ReadFile(SystemInfoPath)
+	if err == nil {
+		var info struct {
+			Env string `json:"env"`
+		}
+		if json.Unmarshal(data, &info) == nil && info.Env != "" {
+			env = info.Env
+		}
+	}
+
 	response := map[string]string{
 		"status": "server is alive",
 		"time":   time.Now().Format(time.RFC3339),
+		"env":    env,
 	}
 	respondWithJSON(w, http.StatusOK, response)
 }
@@ -144,6 +159,71 @@ func MakeAttestationHTMLHandler(fileName, attestationType string) http.HandlerFu
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
 	}
+}
+
+// MakePublicKeyHandler serves a public key file as plain text
+func MakePublicKeyHandler(filePath, keyType string) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodGet {
+            respondWithError(w, http.StatusMethodNotAllowed,
+                "Method not allowed", "Only GET requests are supported")
+            return
+        }
+
+        content, err := os.ReadFile(filePath)
+        if err != nil {
+            respondWithError(w, http.StatusNotFound,
+                fmt.Sprintf("%s public key not available", keyType), err.Error())
+            return
+        }
+
+        w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+        w.Header().Set("X-Content-Type-Options", "nosniff")
+        w.WriteHeader(http.StatusOK)
+        w.Write(content)
+    }
+}
+
+func MakePublicKeyHTMLHandler(filePath, keyType string) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodGet {
+            respondWithError(w, http.StatusMethodNotAllowed,
+                "Method not allowed", "Only GET requests are supported")
+            return
+        }
+
+        content, err := os.ReadFile(filePath)
+        if err != nil {
+            respondWithError(w, http.StatusNotFound,
+                fmt.Sprintf("%s public key not available", keyType), err.Error())
+            return
+        }
+
+        data := struct {
+            Title       string
+            Description string
+            Quote       string
+            ShowVerify  bool
+        }{
+            Title:       fmt.Sprintf("%s Public Key", keyType),
+            Description: "Below is the public key. Click the copy button to copy it.",
+            Quote:       string(content),
+            ShowVerify:  false,
+        }
+
+        tmpl, err := template.New("publicKey").Parse(html.HtmlTemplate)
+        if err != nil {
+            log.Printf("Error parsing HTML template: %v", err)
+            http.Error(w, "Internal server error", http.StatusInternalServerError)
+            return
+        }
+
+        w.Header().Set("Content-Type", "text/html; charset=utf-8")
+        if err := tmpl.Execute(w, data); err != nil {
+            log.Printf("Error executing HTML template: %v", err)
+            http.Error(w, "Internal server error", http.StatusInternalServerError)
+        }
+    }
 }
 
 // MakeDockerComposeFileHandler returns a handler that serves the raw docker-compose file.
@@ -310,31 +390,32 @@ func MakeVMUpdatesHandler() http.HandlerFunc {
 			return
 		}
 
-		// Read VM config
-		data, err := os.ReadFile(VmConfigPath)
+		// Read system info
+		data, err := os.ReadFile(SystemInfoPath)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError,
-				"Cannot read VM config", err.Error())
-			return
-		}
-		var cfg struct {
-			ServiceID string `json:"service_id"`
-		}
-		if err := json.Unmarshal(data, &cfg); err != nil {
-			respondWithError(w, http.StatusInternalServerError,
-				"Invalid VM config format", err.Error())
+				"Cannot read system info", err.Error())
 			return
 		}
 
-		if cfg.ServiceID == "" {
+		var info struct {
+			ServiceID string `json:"service_id"`
+		}
+		if err := json.Unmarshal(data, &info); err != nil {
+			respondWithError(w, http.StatusInternalServerError,
+				"Invalid system info format", err.Error())
+			return
+		}
+
+		if info.ServiceID == "" {
 			respondWithJSON(w, http.StatusOK, map[string]string{
-				"error": "VM is not upgradeable",
+				"message": "VM is not upgradeable",
 			})
 			return
 		}
 
 		// Call external kms-query binary
-		cmd := exec.Command("kms-query", "list_image_filters", cfg.ServiceID)
+		cmd := exec.Command("kms-query", "list_image_filters", info.ServiceID)
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		cmd.Stderr = &out
