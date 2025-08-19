@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"strconv"
@@ -8,6 +9,31 @@ import (
 
 	"github.com/joho/godotenv"
 )
+
+type SystemInfo struct {
+	Env         string `json:"env"`
+	ServiceID   string `json:"service_id,omitempty"`
+	PrivateMode bool   `json:"private_mode,omitempty"`
+}
+
+func loadSystemInfo() {
+	data, err := os.ReadFile(SystemInfoPath)
+	if err != nil {
+		log.Printf("Warning: could not read system_info.json: %v", err)
+		return
+	}
+
+	var info SystemInfo
+	if err := json.Unmarshal(data, &info); err != nil {
+		log.Printf("Warning: could not parse system_info.json: %v", err)
+		return
+	}
+
+	if info.PrivateMode {
+		PrivateMode = true
+		log.Println("Private mode enabled: logs and docker-compose handlers will be disabled")
+	}
+}
 
 // init loads the .env file so that environment variables are available during initialization.
 func init() {
@@ -48,6 +74,8 @@ func init() {
 	
 	PublicKeyEd25519Path = GetEnv("SECRETVM_PUBLIC_KEY_ED25519", "/mnt/secure/docker_wd/crypto/docker_public_key_ed25519.pem")
 	PublicKeySecp256k1Path = GetEnv("SECRETVM_PUBLIC_KEY_SECP256K1", "/mnt/secure/docker_wd/crypto/docker_public_key_secp256k1.pem")
+
+	loadSystemInfo()
 
 	// Create report directory if it doesn't exist
 	if err := os.MkdirAll(ReportDir, 0755); err != nil {
@@ -94,6 +122,7 @@ var (
 	Port         int    // Port number on which the server should listen
 	CertPath     string // Path to SSL certificate file
 	KeyPath      string // Path to SSL key file
+	PrivateMode  bool   // to show or hide logs and docker_compose.yaml
 
 	// Attestation tool configuration
 	AttestTool    string        // Command name for the attestation tool
@@ -113,6 +142,6 @@ var (
 
 	SystemInfoPath string // Path to system_info.json
 
-	PublicKeyEd25519Path  string
-    PublicKeySecp256k1Path string
+	PublicKeyEd25519Path   string
+	PublicKeySecp256k1Path string
 )

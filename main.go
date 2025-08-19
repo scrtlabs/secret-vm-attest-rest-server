@@ -56,13 +56,16 @@ func main() {
 	mux.HandleFunc("/cpu.html", pkg.MakeAttestationHTMLHandler(pkg.CPUAttestationFile, "CPU"))
 	mux.HandleFunc("/self.html", pkg.MakeAttestationHTMLHandler(pkg.SelfAttestationFile, "Self"))
 
-	// VM logs endpoints
-	mux.HandleFunc("/logs", pkg.MakeVMLogsHandler(*secure))
-	mux.HandleFunc("/logs.html", pkg.MakeVMLiveLogsHandler())
+	// VM logs endpoints (only if not private)
+	if !pkg.PrivateMode {
+		
+		mux.HandleFunc("/logs", pkg.MakeVMLogsHandler(*secure))
+		mux.HandleFunc("/logs.html", pkg.MakeVMLiveLogsHandler())
 
-	// New endpoints for docker-compose
-	mux.HandleFunc("/docker-compose", pkg.MakeDockerComposeFileHandler())
-	mux.HandleFunc("/docker-compose.html", pkg.MakeDockerComposeHTMLHandler())
+		// docker-compose endpoints
+		mux.HandleFunc("/docker-compose", pkg.MakeDockerComposeFileHandler())
+		mux.HandleFunc("/docker-compose.html", pkg.MakeDockerComposeHTMLHandler())
+	}
 
 	// New endpoints for resources
 	mux.HandleFunc("/resources", pkg.MakeResourcesHandler())
