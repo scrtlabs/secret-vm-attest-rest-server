@@ -43,8 +43,13 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	status, err := getStatus()
+	if err != nil {
+		status = "server_error"
+	}
+
 	response := map[string]string{
-		"status": "server is alive",
+		"status": status,
 		"time":   time.Now().Format(time.RFC3339),
 		"env":    env,
 	}
@@ -163,67 +168,67 @@ func MakeAttestationHTMLHandler(fileName, attestationType string) http.HandlerFu
 
 // MakePublicKeyHandler serves a public key file as plain text
 func MakePublicKeyHandler(filePath, keyType string) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != http.MethodGet {
-            respondWithError(w, http.StatusMethodNotAllowed,
-                "Method not allowed", "Only GET requests are supported")
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed,
+				"Method not allowed", "Only GET requests are supported")
+			return
+		}
 
-        content, err := os.ReadFile(filePath)
-        if err != nil {
-            respondWithError(w, http.StatusNotFound,
-                fmt.Sprintf("%s public key not available", keyType), err.Error())
-            return
-        }
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			respondWithError(w, http.StatusNotFound,
+				fmt.Sprintf("%s public key not available", keyType), err.Error())
+			return
+		}
 
-        w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-        w.Header().Set("X-Content-Type-Options", "nosniff")
-        w.WriteHeader(http.StatusOK)
-        w.Write(content)
-    }
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusOK)
+		w.Write(content)
+	}
 }
 
 func MakePublicKeyHTMLHandler(filePath, keyType string) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != http.MethodGet {
-            respondWithError(w, http.StatusMethodNotAllowed,
-                "Method not allowed", "Only GET requests are supported")
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed,
+				"Method not allowed", "Only GET requests are supported")
+			return
+		}
 
-        content, err := os.ReadFile(filePath)
-        if err != nil {
-            respondWithError(w, http.StatusNotFound,
-                fmt.Sprintf("%s public key not available", keyType), err.Error())
-            return
-        }
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			respondWithError(w, http.StatusNotFound,
+				fmt.Sprintf("%s public key not available", keyType), err.Error())
+			return
+		}
 
-        data := struct {
-            Title       string
-            Description string
-            Quote       string
-            ShowVerify  bool
-        }{
-            Title:       fmt.Sprintf("%s Public Key", keyType),
-            Description: "Below is the public key. Click the copy button to copy it.",
-            Quote:       string(content),
-            ShowVerify:  false,
-        }
+		data := struct {
+			Title       string
+			Description string
+			Quote       string
+			ShowVerify  bool
+		}{
+			Title:       fmt.Sprintf("%s Public Key", keyType),
+			Description: "Below is the public key. Click the copy button to copy it.",
+			Quote:       string(content),
+			ShowVerify:  false,
+		}
 
-        tmpl, err := template.New("publicKey").Parse(html.HtmlTemplate)
-        if err != nil {
-            log.Printf("Error parsing HTML template: %v", err)
-            http.Error(w, "Internal server error", http.StatusInternalServerError)
-            return
-        }
+		tmpl, err := template.New("publicKey").Parse(html.HtmlTemplate)
+		if err != nil {
+			log.Printf("Error parsing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
 
-        w.Header().Set("Content-Type", "text/html; charset=utf-8")
-        if err := tmpl.Execute(w, data); err != nil {
-            log.Printf("Error executing HTML template: %v", err)
-            http.Error(w, "Internal server error", http.StatusInternalServerError)
-        }
-    }
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := tmpl.Execute(w, data); err != nil {
+			log.Printf("Error executing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	}
 }
 
 // MakeDockerComposeFileHandler returns a handler that serves the raw docker-compose file.

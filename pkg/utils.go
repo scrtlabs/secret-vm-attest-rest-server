@@ -8,6 +8,15 @@ import (
 	"strings"
 )
 
+func runCommand(name string, arg ...string) (string, error) {
+	cmd := exec.Command(name, arg...)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
 // fetchServiceLogs retrieves logs from secret-vm-* systemd services
 func fetchServicesLogs() (string, error) {
 	var buf bytes.Buffer
@@ -100,3 +109,48 @@ func formatBytes(b uint64) string {
 	return fmt.Sprintf("%.0f %s", f, sizes[i])
 }
 
+func getStatus() (string, error) {
+	startupStatus, err := runCommand("systemctl", "show", "secret-vm-startup", "--property=SubState", "--value")
+	if err != nil {
+		return "", fmt.Errorf("could not get secret-vm-startup status: %w", err)
+	}
+
+	if startupStatus == "start" {
+		return "initializing", nil
+	}
+
+	if startupStatus == "failed" {
+		return "init_failed", nil
+	}
+
+	dockerServiceStatus, err := runCommand("systemctl", "show", "secret-vm-docker-start", "--property=SubState", "--value")
+	if err != nil {
+		return "", fmt.Errorf("could not get secret-vm-docker-start status: %w", err)
+	}
+
+	switch dockerServiceStatus {
+	case "failed":
+		return "prep_failed", nil
+	case "running":
+		dockerPsOutput, err := runCommand("docker", "ps", "-q")
+		if err != nil {
+			return "", fmt.Errorf("failed to execute 'docker ps -q': %w", err)
+		}
+
+		if dockerPsOutput != "" {
+			return "running", nil
+		} else {
+			return "preparing", nil
+		}
+	case "dead":
+		journalOutput, _ := runCommand("journalctl", "-u", "secret-vm-docker-start", "--no-pager")
+
+		if strings.Contains(journalOutput, "exited with code 0") {
+			return "exited", nil
+		} else {
+			return "crashed", nil
+		}
+	}
+
+	return "unknown", nil
+}
