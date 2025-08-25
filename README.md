@@ -257,3 +257,8 @@ SECRETVM_ATTEST_TIMEOUT_SEC=10
 * **Method:** `GET`
 * **Description:** Renders the same `docker-compose.yaml` content inside your standard copy-to-clipboard HTML template, complete with your site’s dark theme and copy button for easy sharing.
 
+### `/publickey_secp256k1` & `/publickey_ed25519`
+* **Method:** `GET`
+* **Description:** Renders the public keys of used for Verifiable Message Signing. The respective .html endpoints render the same keys with HTML formatting
+
+
