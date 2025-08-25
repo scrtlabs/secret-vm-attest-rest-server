@@ -22,6 +22,10 @@ SecretVM Attest REST Server is a lightweight REST server implemented in Go. It p
 | `/resources.html`      | GET    | Live dashboard of CPU, memory, and disk usage with animated charts.                                         |
 | `/vm_updates`          | GET    | Returns the upgrade history of the VM (or "VM is not upgradeable") . |
 | `/vm_updates.html`     | GET    | Displays image upgrade filters and descriptions in styled HTML cards.                                               |
+| `/publickey_ed25519`          | GET    | Returns the ED25519 Public Key used for Verifiable Message Signing. |
+| `/publickey_ed25519.html`     | GET    | Returns the ED25519 Public Key used for Verifiable Message Signing with HTML formatting.                                               |
+| `/publickey_secp256k1`          | GET    | Returns the secp256k1 Public Key used for Verifiable Message Signing. |
+| `/publickey_secp256k1.html`     | GET    | Returns the secp256k1 Public Key used for Verifiable Message Signing with HTML formatting.                                               |
 
 ## Features
 
