@@ -60,7 +60,7 @@ func main() {
 	if !pkg.PrivateMode {
 		
 		mux.HandleFunc("/logs", pkg.MakeVMLogsHandler(*secure))
-		mux.HandleFunc("/logs.html", pkg.MakeVMLiveLogsHandler())
+		// mux.HandleFunc("/logs.html", pkg.MakeVMLiveLogsHandler())
 
 		// docker-compose endpoints
 		mux.HandleFunc("/docker-compose", pkg.MakeDockerComposeFileHandler())
