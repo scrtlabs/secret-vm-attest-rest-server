@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"secret-vm-attest-rest-server/pkg/html"
+	"sort"
 	"strconv"
 	"text/template"
 	"time"
@@ -462,81 +463,110 @@ func MakeVMUpdatesHTMLHandler() http.HandlerFunc {
 	}
 }
 
-// MakeVMLogsHandler serves plain-text VM logs (including docker logs),
-// requiring the client to specify either a container name or an index.
+// MakeVMLogsHandler implements /logs endpoint with sorting, filtering, and service selection.
+//
+// - ?service=secretvm → only system logs (journalctl)
+// - ?service={container} → only docker logs for that container
+// - no service param → system logs + all docker logs
+//
+// All lines are sorted by timestamp. Output format matches journalctl (no year).
 func MakeVMLogsHandler(secure bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Only GET allowed
 		if r.Method != http.MethodGet {
 			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
 			return
 		}
 
-		// Parse desired number of lines (default 1000)
+		// Default number of log lines for docker containers
 		lines := 1000
 		if l := r.URL.Query().Get("lines"); l != "" {
-			if v, err := strconv.Atoi(l); err == nil {
+			if v, err := strconv.Atoi(l); err == nil && v > 0 {
 				lines = v
 			}
 		}
 
-		// Extract name and index parameters
-		name := r.URL.Query().Get("name")
-		idxStr := r.URL.Query().Get("index")
-		useIndex := false
-		index := 0
-		if idxStr != "" {
-			if i, err := strconv.Atoi(idxStr); err == nil {
-				index = i
-				useIndex = true
+		service := r.URL.Query().Get("service")
+
+		var collected []LogLine
+		hostName, _ := os.Hostname()
+
+		// Collect system logs if service is not specified or equals "secretvm"
+		if service == "" || service == "secretvm" {
+			if sysLogs, err := fetchServicesLogs(); err == nil {
+				collected = append(collected, parseJournalOutput(sysLogs)...)
+			}
+			if service == "secretvm" {
+				sort.Slice(collected, func(i, j int) bool { return collected[i].Timestamp.Before(collected[j].Timestamp) })
+				writeLogsResponse(w, collected)
+				return
 			}
 		}
 
-		// Fetch logs, honoring error if neither selector nor valid container
-		logs, err := fetchServicesLogs()
-		if err != nil {
-			log.Printf("Error fetching system logs: %v", err)
-		}
+		// Collect docker logs (only in secure mode)
 		if secure {
-			// fetch docker logs only in https mode, because during http mode
-			// the docker is still configuring
-			out, err := fetchDockerLogsWithSelector(name, index, useIndex, lines)
-			if err != nil {
-				log.Printf("Error fetching Docker logs: %v", err)
+			if service != "" && service != "secretvm" {
+				// Logs for a single container
+				if ll, err := fetchDockerLogsForContainer(service, lines, hostName); err == nil {
+					sort.Slice(ll, func(i, j int) bool { return ll[i].Timestamp.Before(ll[j].Timestamp) })
+					writeLogsResponse(w, ll)
+					return
+				}
+			} else {
+				// Logs for all containers
+				if ll, err := fetchDockerLogsAll(lines, hostName); err == nil {
+					collected = append(collected, ll...)
+				}
 			}
-			logs += out
 		}
 
-		// Return logs as plain text
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(logs))
+		// Sort combined logs and return
+		sort.Slice(collected, func(i, j int) bool {
+			return collected[i].Timestamp.Before(collected[j].Timestamp)
+		})
+		writeLogsResponse(w, collected)
 	}
 }
 
-// MakeVMLiveLogsHandler serves the live-updating HTML page
-// that polls /logs with a selectable line count.
-func MakeVMLiveLogsHandler() http.HandlerFunc {
+// MakeServicesHandler implements /services endpoint.
+// It returns a JSON array containing "secretvm" plus all docker containers (running and stopped).
+func MakeServicesHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
 			return
 		}
-		data := struct{ Title string }{Title: "Live Docker Container Logs"}
-		tmpl, err := template.New("liveLogs").Parse(html.DockerLiveLogsTemplate)
+		names, err := listAllDockerContainerNames()
 		if err != nil {
-			log.Printf("Error parsing live logs template: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			respondWithJSON(w, http.StatusOK, []string{"secretvm"})
 			return
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := tmpl.Execute(w, data); err != nil {
-			log.Printf("Error executing live logs template: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
+		services := append([]string{"secretvm"}, names...)
+		respondWithJSON(w, http.StatusOK, services)
 	}
 }
+
+// // MakeVMLiveLogsHandler serves the live-updating HTML page
+// // that polls /logs with a selectable line count.
+// func MakeVMLiveLogsHandler() http.HandlerFunc {
+// 	return func(w http.ResponseWriter, r *http.Request) {
+// 		if r.Method != http.MethodGet {
+// 			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
+// 			return
+// 		}
+// 		data := struct{ Title string }{Title: "Live Docker Container Logs"}
+// 		tmpl, err := template.New("liveLogs").Parse(html.DockerLiveLogsTemplate)
+// 		if err != nil {
+// 			log.Printf("Error parsing live logs template: %v", err)
+// 			http.Error(w, "Internal server error", http.StatusInternalServerError)
+// 			return
+// 		}
+// 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+// 		if err := tmpl.Execute(w, data); err != nil {
+// 			log.Printf("Error executing live logs template: %v", err)
+// 			http.Error(w, "Internal server error", http.StatusInternalServerError)
+// 		}
+// 	}
+// }
 
 // Helper function to respond with a JSON error message.
 func respondWithError(w http.ResponseWriter, code int, error string, details string) {
