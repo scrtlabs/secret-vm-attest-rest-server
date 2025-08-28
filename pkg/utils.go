@@ -242,11 +242,10 @@ func listAllDockerContainerNames() ([]string, error) {
 }
 
 // formatDockerAsJournal converts a docker log line into a journalctl-like format:
-// "Aug 27 07:58:24 <host> <container>[0]: <message>"
-func formatDockerAsJournal(ts time.Time, host, container, msg string) string {
-	return fmt.Sprintf("%s %s %s[0]: %s", ts.Local().Format("Jan 2 15:04:05"), host, container, msg)
+// "Aug 27 07:58:24 <host> <container>[pid]: <message>"
+func formatDockerAsJournal(ts time.Time, host, container string, pid int, msg string) string {
+	return fmt.Sprintf("%s %s %s[%d]: %s", ts.Local().Format("Jan 2 15:04:05"), host, container, pid, msg)
 }
-
 // fetchDockerLogsForContainer retrieves logs for a specific container with timestamps.
 // It converts docker ISO timestamps into journalctl-like lines.
 func fetchDockerLogsForContainer(container string, lines int, hostName string) ([]LogLine, error) {
@@ -259,6 +258,9 @@ func fetchDockerLogsForContainer(container string, lines int, hostName string) (
 	if text == "" {
 		return nil, nil
 	}
+
+	// Get container init PID once; if it fails, fallback to 0
+	pid := getContainerInitPID(container)
 
 	var res []LogLine
 	for _, l := range strings.Split(text, "\n") {
@@ -280,7 +282,7 @@ func fetchDockerLogsForContainer(container string, lines int, hostName string) (
 				continue
 			}
 		}
-		jline := formatDockerAsJournal(ts, hostName, container, msg)
+		jline := formatDockerAsJournal(ts, hostName, container, pid, msg)
 		res = append(res, LogLine{Timestamp: ts.Local(), Text: jline})
 	}
 	return res, nil
@@ -318,4 +320,19 @@ func writeLogsResponse(w http.ResponseWriter, lines []LogLine) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(b.String()))
+}
+
+// getContainerInitPID returns the host PID of the container's init process.
+// We use `docker inspect -f '{{.State.Pid}}' <container>`.
+func getContainerInitPID(container string) int {
+	out, err := exec.Command("docker", "inspect", "-f", "{{.State.Pid}}", container).Output()
+	if err != nil {
+		return 0
+	}
+	s := strings.TrimSpace(string(out))
+	pid, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+	return pid
 }

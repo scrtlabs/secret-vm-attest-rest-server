@@ -58,22 +58,22 @@ func main() {
 
 	// VM logs endpoints (only if not private)
 	if !pkg.PrivateMode {
-		
+
 		mux.HandleFunc("/logs", pkg.MakeVMLogsHandler(*secure))
 		// mux.HandleFunc("/logs.html", pkg.MakeVMLiveLogsHandler())
 
 		// docker-compose endpoints
 		mux.HandleFunc("/docker-compose", pkg.MakeDockerComposeFileHandler())
 		mux.HandleFunc("/docker-compose.html", pkg.MakeDockerComposeHTMLHandler())
+		mux.HandleFunc("/services", pkg.MakeServicesHandler())
+		// New endpoints for image updates
+		mux.HandleFunc("/vm_upgrades", pkg.MakeVMUpdatesHandler())
+		mux.HandleFunc("/vm_upgrades.html", pkg.MakeVMUpdatesHTMLHandler())
 	}
 
 	// New endpoints for resources
 	mux.HandleFunc("/resources", pkg.MakeResourcesHandler())
 	mux.HandleFunc("/resources.html", pkg.MakeResourcesHTMLHandler())
-
-	// New endpoints for image updates
-	mux.HandleFunc("/vm_upgrades", pkg.MakeVMUpdatesHandler())
-	mux.HandleFunc("/vm_upgrades.html", pkg.MakeVMUpdatesHTMLHandler())
 
 	mux.Handle("/publickey_ed25519", pkg.MakePublicKeyHandler(pkg.PublicKeyEd25519Path, "ed25519"))
 	mux.Handle("/publickey_secp256k1", pkg.MakePublicKeyHandler(pkg.PublicKeySecp256k1Path, "secp256k1"))
