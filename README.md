@@ -14,14 +14,14 @@ SecretVM Attest REST Server is a lightweight REST server implemented in Go. It p
 | `/gpu.html`            | GET    | Renders the GPU attestation report in a styled HTML page with copy-to-clipboard.                            |
 | `/cpu.html`            | GET    | Renders the CPU attestation report in a styled HTML page with copy-to-clipboard.                            |
 | `/self.html`           | GET    | Renders the self attestation report in a styled HTML page with copy-to-clipboard.                           |
-| `/logs`                | GET    | Retrieves VM logs (plain text). Requires exactly one of `name` or `index`. Default `lines=1000`.            |
-| `/logs.html`           | GET    | Live web interface for real-time log viewing with dark theme, auto-scroll, and copy-to-clipboard.           |
+| `/logs`                | GET    | Retrieves VM logs (plain text). Logs now include systemd services and all Docker containers. Supports filtering by `?service=` parameter. |
+| `/services`            | GET    | Returns list of available services (`secretvm` + all Docker containers).                                    |      |
 | `/docker-compose`      | GET    | Returns the raw `docker-compose.yaml` as plain text.                                                        |
 | `/docker-compose.html` | GET    | Renders the `docker-compose.yaml` in an HTML template with copy-to-clipboard.                               |
 | `/resources`           | GET    | Returns current system resource usage as JSON (memory, disk, CPU).                                          |
 | `/resources.html`      | GET    | Live dashboard of CPU, memory, and disk usage with animated charts.                                         |
-| `/vm_updates`          | GET    | Returns the upgrade history of the VM (or "VM is not upgradeable") . |
-| `/vm_updates.html`     | GET    | Displays image upgrade filters and descriptions in styled HTML cards.                                               |
+| `/vm_upgrades`          | GET    | Returns the upgrade history of the VM (or "VM is not upgradeable") . |
+| `/vm_upgrades.html`     | GET    | Displays image upgrade filters and descriptions in styled HTML cards.                                               |
 | `/publickey_ed25519`          | GET    | Returns the ED25519 Public Key used for Verifiable Message Signing. |
 | `/publickey_ed25519.html`     | GET    | Returns the ED25519 Public Key used for Verifiable Message Signing with HTML formatting.                                               |
 | `/publickey_secp256k1`          | GET    | Returns the secp256k1 Public Key used for Verifiable Message Signing. |
@@ -41,7 +41,8 @@ SecretVM Attest REST Server is a lightweight REST server implemented in Go. It p
 - **Method Validation:** All endpoints validate HTTP methods to ensure proper usage.
 - **Standardized Error Responses:** Consistent JSON error responses across all endpoints.
 - **Attestation Report Visualization**: Offers HTML endpoints (e.g., `/gpu.html`) that display attestation reports in a web page format. These pages are styled for readability and include an easy copy-to-clipboard option for the report content.
-- **VM Logs Monitoring**: Provides an endpoint to fetch VM logs and a live web interface for real-time log viewing. The web interface (`/logs.html`) features a dark theme, auto-scrolling, log length selection, and copy-to-clipboard functionality.
+- **VM Logs Monitoring**: `/logs` endpoint now unifies systemd and Docker logs, supports service filtering.
+- **Services Listing**: `/services` endpoint shows all available services (`secretvm` and Docker containers).
 
 ## Project Structure
 
@@ -168,17 +169,31 @@ SECRETVM_ATTEST_TIMEOUT_SEC=10
 ### `/logs`
 
 - **Method:** GET  
-- **Description:** Retrieves the VM log entries including logs from a Docker container (intended for debugging/monitoring). By default, this endpoint targets the container named `secret-vm-docker`. If that container is not found, it will fall back to the first running container.  
+- **Description:** Retrieves VM logs (plain text). Includes both systemd service logs (`secret-vm-*`) and Docker container logs, sorted by timestamp.  
 - **Query Parameters:**
-  - `name` (string) – exact container name (takes priority over `index`)
-  - `index` (integer) – zero-based index into the `docker ps` list
-  - `lines` (optional) – number of lines to fetch (100, 500, 1000; default 1000)
-- **Response:** Plain text output of the requested log lines.  
-**Error Handling:**  
-  - **400 Bad Request** if neither `name` nor `index` is provided.  
-  - **404 Not Found** if no running container matches the specified `name` or `index`.  
+  - `service` (string, optional)  
+    - `secretvm` → only systemd logs  
+    - `<container-name>` → only logs for the specified Docker container  
+    - *empty* → combined systemd + all Docker container logs  
+  - `lines` (integer, optional) – number of log lines to fetch per container (default: `1000`)  
+- **Response:** Plain text output of the requested logs.  
 
-### `/logs.html`
+- **Error Handling:**  
+  - **404 Not Found** if the specified service/container does not exist.  
+
+### `/services`
+
+- **Method:** GET  
+- **Description:** Returns a JSON array of available services. Always includes `secretvm` plus all Docker containers (running and stopped).  
+- **Response Example:**
+  ```json
+  [
+    "secretvm",
+    "my-container-1",
+    "my-container-2"
+  ]
+
+<!-- ### `/logs.html`
 
 - **Method:** GET  
 **Description:**  
@@ -186,7 +201,7 @@ SECRETVM_ATTEST_TIMEOUT_SEC=10
   - Enter the container name or index, then click **Apply**.  
   - After **Apply**, the page will auto-refresh the logs every 2 seconds, **only** if the log view is scrolled to the bottom.  
   - The **Copy Logs** button copies the currently displayed logs to your clipboard.  
-  - If the container isn’t found or the input field is left empty, the interface displays the full error message returned by the server.
+  - If the container isn’t found or the input field is left empty, the interface displays the full error message returned by the server. -->
 
 
 
@@ -215,9 +230,9 @@ SECRETVM_ATTEST_TIMEOUT_SEC=10
 * **Method:** `GET`
 * **Description:** Renders a live dashboard of CPU, memory, and disk usage with animated doughnut charts, refreshing every 2 seconds. Styled with Tailwind CSS and Chart.js for an interactive experience.
 
-### `/vm_updates` & `/vm_updates.html`
+### `/vm_upgrades` & `/vm_upgrades.html`
 
-#### `/vm_updates`
+#### `/vm_upgrades`
 
 * **Method:** `GET`
 * **Description:** If the VM’s `service_id` is missing in the config, returns:
@@ -240,7 +255,7 @@ SECRETVM_ATTEST_TIMEOUT_SEC=10
   }
   ```
 
-#### `/vm_updates.html`
+#### `/vm_upgrades.html`
 
 * **Method:** `GET`
 * **Description:** Displays each image filter and its description in clearly-labeled cards (“Image” section & “Description” section), stacked vertically and styled to match the rest of the site.
