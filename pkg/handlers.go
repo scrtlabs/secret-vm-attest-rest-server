@@ -30,18 +30,10 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Default env value
-	env := "unknown"
 
-	// Try to read system_info.json if available
-	data, err := os.ReadFile(SystemInfoPath)
-	if err == nil {
-		var info struct {
-			Env string `json:"env"`
-		}
-		if json.Unmarshal(data, &info) == nil && info.Env != "" {
-			env = info.Env
-		}
+	env := EnvValue
+	if env == "" {
+		env = "unknown"
 	}
 
 	status, err := getStatus()
@@ -396,24 +388,8 @@ func MakeVMUpdatesHandler() http.HandlerFunc {
 			return
 		}
 
-		// Read system info
-		data, err := os.ReadFile(SystemInfoPath)
-		if err != nil {
-			respondWithError(w, http.StatusInternalServerError,
-				"Cannot read system info", err.Error())
-			return
-		}
-
-		var info struct {
-			ServiceID string `json:"service_id"`
-		}
-		if err := json.Unmarshal(data, &info); err != nil {
-			respondWithError(w, http.StatusInternalServerError,
-				"Invalid system info format", err.Error())
-			return
-		}
-
-		if info.ServiceID == "" {
+		sid := ServiceIDValue
+		if sid == "" {
 			respondWithJSON(w, http.StatusOK, map[string]string{
 				"message": "VM is not upgradeable",
 			})
@@ -421,7 +397,7 @@ func MakeVMUpdatesHandler() http.HandlerFunc {
 		}
 
 		// Call external kms-query binary
-		cmd := exec.Command("kms-query", "list_image_filters", info.ServiceID)
+		cmd := exec.Command("kms-query", "list_image_filters", sid)
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		cmd.Stderr = &out

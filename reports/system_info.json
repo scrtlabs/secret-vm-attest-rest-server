@@ -1,4 +1,5 @@
 {
     "service_id":"TestService",
-    "env":"dev"
+    "env":"dev",
+    "private_mode":true
 }
