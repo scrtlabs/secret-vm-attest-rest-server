@@ -16,22 +16,42 @@ type SystemInfo struct {
 	PrivateMode bool   `json:"private_mode,omitempty"`
 }
 
+// loadSystemInfo reads system_info.json if available, otherwise falls back to VM config
 func loadSystemInfo() {
-	data, err := os.ReadFile(SystemInfoPath)
-	if err != nil {
-		log.Printf("Warning: could not read system_info.json: %v", err)
-		return
-	}
-
 	var info SystemInfo
-	if err := json.Unmarshal(data, &info); err != nil {
-		log.Printf("Warning: could not parse system_info.json: %v", err)
-		return
+	src := "none"
+
+	// Try system_info.json first
+	if data, err := os.ReadFile(SystemInfoPath); err == nil {
+		if json.Unmarshal(data, &info) == nil {
+			src = "system_info"
+		}
 	}
 
+	// If system_info.json is not found, try VM config
+	if src == "none" {
+		if data, err := os.ReadFile(VmConfigPath); err == nil {
+			if json.Unmarshal(data, &info) == nil {
+				src = "vm_config"
+			}
+		}
+	}
+
+	// Cache values globally
+	EnvValue = info.Env
+	ServiceIDValue = info.ServiceID
 	if info.PrivateMode {
 		PrivateMode = true
-		log.Println("Private mode enabled: logs and docker-compose handlers will be disabled")
+	}
+
+	// Print which source was used
+	switch src {
+	case "system_info":
+		log.Println("Config source: system_info.json")
+	case "vm_config":
+		log.Println("Config source: secret-vm.json")
+	default:
+		log.Println("Config source: none (using defaults)")
 	}
 }
 
@@ -63,7 +83,7 @@ func init() {
 
 	// Path to docker-compose file (must be set in env).
 	DockerComposePath = GetEnv("SECRETVM_DOCKER_COMPOSE_PATH", "docker_compose.yaml")
-	
+
 	// Path to vm config file (must be set in env).
 	VmConfigPath = GetEnv("SECRETVM_CONFIG_PATH", "/mnt/config/secret-vm.json")
 
@@ -71,7 +91,7 @@ func init() {
 	FsMountPath = GetEnv("SECRETVM_FS_MOUNT_PATH", "/mnt/secure")
 
 	SystemInfoPath = GetEnv("SECRETVM_SYSTEM_INFO_PATH", "/mnt/secure/system_info.json")
-	
+
 	PublicKeyEd25519Path = GetEnv("SECRETVM_PUBLIC_KEY_ED25519", "/mnt/secure/docker_wd/crypto/docker_public_key_ed25519.pem")
 	PublicKeySecp256k1Path = GetEnv("SECRETVM_PUBLIC_KEY_SECP256K1", "/mnt/secure/docker_wd/crypto/docker_public_key_secp256k1.pem")
 
@@ -144,4 +164,8 @@ var (
 
 	PublicKeyEd25519Path   string
 	PublicKeySecp256k1Path string
+
+	// Cached values from system_info.json or VM config
+	EnvValue       string
+	ServiceIDValue string
 )

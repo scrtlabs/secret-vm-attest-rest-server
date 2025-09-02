@@ -56,20 +56,12 @@ func main() {
 	mux.HandleFunc("/cpu.html", pkg.MakeAttestationHTMLHandler(pkg.CPUAttestationFile, "CPU"))
 	mux.HandleFunc("/self.html", pkg.MakeAttestationHTMLHandler(pkg.SelfAttestationFile, "Self"))
 
-	// VM logs endpoints (only if not private)
-	if !pkg.PrivateMode {
-
-		mux.HandleFunc("/logs", pkg.MakeVMLogsHandler(*secure))
-		// mux.HandleFunc("/logs.html", pkg.MakeVMLiveLogsHandler())
-
-		// docker-compose endpoints
-		mux.HandleFunc("/docker-compose", pkg.MakeDockerComposeFileHandler())
-		mux.HandleFunc("/docker-compose.html", pkg.MakeDockerComposeHTMLHandler())
-		mux.HandleFunc("/services", pkg.MakeServicesHandler())
-		// New endpoints for image updates
-		mux.HandleFunc("/vm_upgrades", pkg.MakeVMUpdatesHandler())
-		mux.HandleFunc("/vm_upgrades.html", pkg.MakeVMUpdatesHTMLHandler())
-	}
+	mux.HandleFunc("/logs", pkg.PrivateGuard(pkg.MakeVMLogsHandler(*secure)))
+	mux.HandleFunc("/docker-compose", pkg.PrivateGuard(pkg.MakeDockerComposeFileHandler()))
+	mux.HandleFunc("/docker-compose.html", pkg.PrivateGuard(pkg.MakeDockerComposeHTMLHandler()))
+	mux.HandleFunc("/services", pkg.PrivateGuard(pkg.MakeServicesHandler()))
+	mux.HandleFunc("/vm_upgrades", pkg.PrivateGuard(pkg.MakeVMUpdatesHandler()))
+	mux.HandleFunc("/vm_upgrades.html", pkg.PrivateGuard(pkg.MakeVMUpdatesHTMLHandler()))
 
 	// New endpoints for resources
 	mux.HandleFunc("/resources", pkg.MakeResourcesHandler())
