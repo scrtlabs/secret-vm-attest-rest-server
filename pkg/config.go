@@ -11,9 +11,10 @@ import (
 )
 
 type SystemInfo struct {
-	Env         string `json:"env"`
-	ServiceID   string `json:"service_id,omitempty"`
-	PrivateMode bool   `json:"private_mode,omitempty"`
+	Env              string `json:"env"`
+	ServiceID        string `json:"service_id,omitempty"`
+	PrivateMode      bool   `json:"private_mode,omitempty"`
+	SecretVMDevToken string `json:"secretvm_dev_token,omitempty"`
 }
 
 // loadSystemInfo reads system_info.json if available, otherwise falls back to VM config
@@ -42,6 +43,11 @@ func loadSystemInfo() {
 	ServiceIDValue = info.ServiceID
 	if info.PrivateMode {
 		PrivateMode = true
+	}
+
+	// fallback token source if not set via env
+	if AccessToken == "" && info.SecretVMDevToken != "" {
+		AccessToken = info.SecretVMDevToken
 	}
 
 	// Print which source was used
@@ -102,7 +108,7 @@ func init() {
 	PublicKeySecp256k1Path = GetEnv("SECRETVM_PUBLIC_KEY_SECP256K1", "/mnt/secure/docker_wd/crypto/docker_public_key_secp256k1.pem")
 
 	// New sensitive config from extra env
-	AccessToken   = GetEnv("SECRETVM_DEV_TOKEN", "")     // header: X-Dev-Token
+	AccessToken = GetEnv("SECRETVM_DEV_TOKEN", "")             // header: X-Dev-Token
 	EndpointsMask = GetEnv("SECRETVM_ENDPOINTS_MASK", "01010") // bit1=docker-compose, bit3=vm-upgrades open
 	loadSystemInfo()
 
@@ -177,7 +183,7 @@ var (
 	// Cached values from system_info.json or VM config
 	EnvValue       string
 	ServiceIDValue string
-	EnvPath       string
-	AccessToken   string
-	EndpointsMask string
+	EnvPath        string
+	AccessToken    string
+	EndpointsMask  string
 )
