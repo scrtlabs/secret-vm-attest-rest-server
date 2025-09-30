@@ -35,6 +35,9 @@
   </main>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      const api = (path) => token ? `${path}${path.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}` : path;
       const makeChart = (ctx, label, unit) => new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -50,7 +53,7 @@
 
       async function updateCharts() {
         try {
-          const stats = await (await fetch('/resources')).json();
+          const stats = await (await fetch(api('/resources'))).json();
           cpuChart.data.datasets[0].data = [stats.cpu_percent, 100 - stats.cpu_percent];
           cpuChart.update();
           document.getElementById('cpuText').textContent = stats.cpu_percent.toFixed(1) + '%';

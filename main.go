@@ -62,10 +62,8 @@ func main() {
 	mux.HandleFunc("/services", pkg.PrivateGuard(pkg.MakeServicesHandler()))
 	mux.HandleFunc("/vm_upgrades", pkg.PrivateGuard(pkg.MakeVMUpdatesHandler()))
 	mux.HandleFunc("/vm_upgrades.html", pkg.PrivateGuard(pkg.MakeVMUpdatesHTMLHandler()))
-
-	// New endpoints for resources
-	mux.HandleFunc("/resources", pkg.MakeResourcesHandler())
-	mux.HandleFunc("/resources.html", pkg.MakeResourcesHTMLHandler())
+	mux.HandleFunc("/resources", pkg.PrivateGuard(pkg.MakeResourcesHandler()))
+	mux.HandleFunc("/resources.html", pkg.PrivateGuard(pkg.MakeResourcesHTMLHandler()))
 
 	mux.Handle("/publickey_ed25519", pkg.MakePublicKeyHandler(pkg.PublicKeyEd25519Path, "ed25519"))
 	mux.Handle("/publickey_secp256k1", pkg.MakePublicKeyHandler(pkg.PublicKeySecp256k1Path, "secp256k1"))

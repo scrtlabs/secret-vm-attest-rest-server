@@ -62,6 +62,12 @@ func init() {
 		log.Println("No .env file found in pkg")
 	}
 
+	// Load additional .env from SECRETVM_ENV_PATH (can override values)
+	EnvPath = GetEnv("SECRETVM_ENV_PATH", "/mnt/secure/docker_wd/usr/.env")
+	if err := godotenv.Load(EnvPath); err != nil {
+		log.Printf("No extra env at %s (skip)\n", EnvPath)
+	}
+
 	// Now initialize configuration variables.
 	ReportDir = GetEnv("SECRETVM_REPORT_DIR", "reports")
 	RESTServerIP = GetEnv("SECRETVM_REST_SERVER_IP", "0.0.0.0")
@@ -95,6 +101,9 @@ func init() {
 	PublicKeyEd25519Path = GetEnv("SECRETVM_PUBLIC_KEY_ED25519", "/mnt/secure/docker_wd/crypto/docker_public_key_ed25519.pem")
 	PublicKeySecp256k1Path = GetEnv("SECRETVM_PUBLIC_KEY_SECP256K1", "/mnt/secure/docker_wd/crypto/docker_public_key_secp256k1.pem")
 
+	// New sensitive config from extra env
+	AccessToken   = GetEnv("SECRETVM_DEV_TOKEN", "")     // header: X-Dev-Token
+	EndpointsMask = GetEnv("SECRETVM_ENDPOINTS_MASK", "01010") // bit1=docker-compose, bit3=vm-upgrades open
 	loadSystemInfo()
 
 	// Create report directory if it doesn't exist
@@ -168,4 +177,7 @@ var (
 	// Cached values from system_info.json or VM config
 	EnvValue       string
 	ServiceIDValue string
+	EnvPath       string
+	AccessToken   string
+	EndpointsMask string
 )
