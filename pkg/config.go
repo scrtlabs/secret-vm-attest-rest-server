@@ -15,6 +15,7 @@ type SystemInfo struct {
 	ServiceID        string `json:"service_id,omitempty"`
 	PrivateMode      bool   `json:"private_mode,omitempty"`
 	SecretVMDevToken string `json:"secretvm_dev_token,omitempty"`
+	EndpointsMask    string `json:"endpoints_mask,omitempty"`
 }
 
 // loadSystemInfo reads system_info.json if available, otherwise falls back to VM config
@@ -48,6 +49,11 @@ func loadSystemInfo() {
 	// fallback token source if not set via env
 	if AccessToken == "" && info.SecretVMDevToken != "" {
 		AccessToken = info.SecretVMDevToken
+	}
+
+	// fallback mask source if not set via env
+	if EndpointsMask == "" && info.EndpointsMask != "" {
+		EndpointsMask = info.EndpointsMask
 	}
 
 	// Print which source was used
