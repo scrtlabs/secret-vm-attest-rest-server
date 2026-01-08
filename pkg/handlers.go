@@ -396,8 +396,15 @@ func MakeVMUpdatesHandler() http.HandlerFunc {
 			return
 		}
 
+		// Determine the query command based on the hardware environment.
+        // If /dev/sev-guest exists, we are running on AMD SEV-SNP.
+        queryCmd := "list_image_filters" // Default to TDX
+        if _, err := os.Stat("/dev/sev-guest"); err == nil {
+            queryCmd = "list_image_filters_amd"
+        }
+
 		// Call external kms-query binary
-		cmd := exec.Command("kms-query", "list_image_filters", sid)
+		cmd := exec.Command("kms-query", queryCmd, sid)
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		cmd.Stderr = &out
