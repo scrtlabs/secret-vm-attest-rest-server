@@ -5,13 +5,14 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"html"
 	"log"
 	"math"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"secret-vm-attest-rest-server/pkg/html"
+	htmlpkg "secret-vm-attest-rest-server/pkg/html"
 	"sort"
 	"strconv"
 	"text/template"
@@ -29,7 +30,6 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
 		return
 	}
-
 
 	env := EnvValue
 	if env == "" {
@@ -145,7 +145,7 @@ func MakeAttestationHTMLHandler(fileName, attestationType string) http.HandlerFu
 		}
 
 		// Parse and execute HTML template
-		tmpl, err := template.New("attestationHtml").Parse(html.HtmlTemplate)
+		tmpl, err := template.New("attestationHtml").Parse(htmlpkg.HtmlTemplate)
 		if err != nil {
 			log.Printf("Error parsing HTML template: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -209,7 +209,7 @@ func MakePublicKeyHTMLHandler(filePath, keyType string) http.HandlerFunc {
 			ShowVerify:  false,
 		}
 
-		tmpl, err := template.New("publicKey").Parse(html.HtmlTemplate)
+		tmpl, err := template.New("publicKey").Parse(htmlpkg.HtmlTemplate)
 		if err != nil {
 			log.Printf("Error parsing HTML template: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -250,11 +250,11 @@ func MakeDockerComposeFileHandler() http.HandlerFunc {
 			return
 		}
 
-		// Serve as plain text
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		// Serve as HTML with pre tag to preserve trailing newlines
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(http.StatusOK)
-		w.Write(content)
+		fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{background:#1e1e1e;color:#e0e0e0;margin:0;padding:10px;font-family:monospace}pre{margin:0;white-space:pre}</style></head><body><pre>%s&#8203;</pre><script>document.oncopy=function(e){var s=window.getSelection().toString();if(s.endsWith('\u200B')){e.preventDefault();e.clipboardData.setData('text/plain',s.slice(0,-1))}}</script></body></html>`, html.EscapeString(string(content)))
 	}
 }
 
@@ -291,7 +291,7 @@ func MakeDockerComposeHTMLHandler() http.HandlerFunc {
 		}
 
 		// Parse and execute shared HTML template
-		tmpl, err := template.New("dockerCompose").Parse(html.HtmlTemplate)
+		tmpl, err := template.New("dockerCompose").Parse(htmlpkg.HtmlTemplate)
 		if err != nil {
 			log.Printf("Error parsing HTML template: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -397,11 +397,11 @@ func MakeVMUpdatesHandler() http.HandlerFunc {
 		}
 
 		// Determine the query command based on the hardware environment.
-        // If /dev/sev-guest exists, we are running on AMD SEV-SNP.
-        queryCmd := "list_image_filters" // Default to TDX
-        if _, err := os.Stat("/dev/sev-guest"); err == nil {
-            queryCmd = "list_image_filters_amd"
-        }
+		// If /dev/sev-guest exists, we are running on AMD SEV-SNP.
+		queryCmd := "list_image_filters" // Default to TDX
+		if _, err := os.Stat("/dev/sev-guest"); err == nil {
+			queryCmd = "list_image_filters_amd"
+		}
 
 		// Call external kms-query binary
 		cmd := exec.Command("kms-query", queryCmd, sid)
@@ -439,7 +439,7 @@ func MakeVMUpdatesHTMLHandler() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := html.VMUpdatesTmpl.ExecuteTemplate(w, "vm_updates.html", nil); err != nil {
+		if err := htmlpkg.VMUpdatesTmpl.ExecuteTemplate(w, "vm_updates.html", nil); err != nil {
 			log.Printf("template execute error: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
