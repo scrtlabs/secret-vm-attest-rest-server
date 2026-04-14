@@ -56,6 +56,10 @@ func main() {
 	mux.HandleFunc("/cpu.html", pkg.MakeAttestationHTMLHandler(pkg.CPUAttestationFile, "CPU"))
 	mux.HandleFunc("/self.html", pkg.MakeAttestationHTMLHandler(pkg.SelfAttestationFile, "Self"))
 
+	// Register endpoints for dynamic ITA JWT
+	mux.HandleFunc("/intel-jwt", pkg.MakeItaJwtHandler())
+	mux.HandleFunc("/intel-jwt.html", pkg.MakeItaJwtHTMLHandler())
+
 	mux.HandleFunc("/logs", pkg.PrivateGuard(pkg.MakeVMLogsHandler(*secure)))
 	mux.HandleFunc("/docker-compose", pkg.PrivateGuard(pkg.MakeDockerComposeFileHandler()))
 	mux.HandleFunc("/docker-compose.html", pkg.PrivateGuard(pkg.MakeDockerComposeHTMLHandler()))

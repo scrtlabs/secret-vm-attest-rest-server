@@ -3,9 +3,12 @@ package pkg
 import (
 	"bytes"
 	"embed"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -15,6 +18,7 @@ import (
 	htmlpkg "secret-vm-attest-rest-server/pkg/html"
 	"sort"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 
@@ -576,4 +580,123 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(code)
 	w.Write(response)
+}
+
+func fetchItaJwt() (string, error, int) {
+	if ItaApiKey == "" || ItaPolicyId == "" {
+		return "", fmt.Errorf("ITA API Key or Policy ID is not configured"), http.StatusInternalServerError
+	}
+
+	quoteFilePath := filepath.Join(ReportDir, CPUAttestationFile)
+	rawQuote, err := os.ReadFile(quoteFilePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read raw quote: %v", err), http.StatusInternalServerError
+	}
+
+	hexStr := strings.TrimSpace(string(rawQuote))
+	quoteBytes, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode hex quote: %v", err), http.StatusInternalServerError
+	}
+	b64Quote := base64.StdEncoding.EncodeToString(quoteBytes)
+
+	payload := map[string]interface{}{
+		"quote":      b64Quote,
+		"policy_ids": []string{ItaPolicyId},
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	req, err := http.NewRequest("POST", ItaApiUrl, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return "", fmt.Errorf("failed to create ITA request: %v", err), http.StatusInternalServerError
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("x-api-key", ItaApiKey)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to contact ITA API: %v", err), http.StatusInternalServerError
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read ITA response: %v", err), http.StatusInternalServerError
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("ITA API returned status %d: %s", resp.StatusCode, string(respBody)), resp.StatusCode
+	}
+
+	var itaResp struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(respBody, &itaResp); err != nil || itaResp.Token == "" {
+		return "", fmt.Errorf("invalid ITA response format or empty token"), http.StatusInternalServerError
+	}
+
+	return itaResp.Token, nil, http.StatusOK
+}
+
+// MakeItaJwtHandler dynamically fetches the ITA JWT token.
+func MakeItaJwtHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
+			return
+		}
+
+		token, err, code := fetchItaJwt()
+		if err != nil {
+			respondWithError(w, code, "Failed to fetch ITA JWT", err.Error())
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(token))
+	}
+}
+
+// MakeItaJwtHTMLHandler dynamically fetches and renders the ITA JWT token.
+func MakeItaJwtHTMLHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
+			return
+		}
+
+		token, err, code := fetchItaJwt()
+		if err != nil {
+			respondWithError(w, code, "Failed to fetch ITA JWT", err.Error())
+			return
+		}
+
+		data := struct {
+			Title       string
+			Description string
+			Quote       string
+			ShowVerify  bool
+		}{
+			Title:       "Intel Trust Authority JWT",
+			Description: "Below is the dynamically fetched Intel Trust Authority JWT. Click the copy button to copy it.",
+			Quote:       token,
+			ShowVerify:  false,
+		}
+
+		tmpl, err := template.New("itaJwtHtml").Parse(htmlpkg.HtmlTemplate)
+		if err != nil {
+			log.Printf("Error parsing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := tmpl.Execute(w, data); err != nil {
+			log.Printf("Error executing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	}
 }

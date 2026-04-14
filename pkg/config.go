@@ -16,6 +16,8 @@ type SystemInfo struct {
 	PrivateMode      bool   `json:"private_mode,omitempty"`
 	SecretVMDevToken string `json:"secretvm_dev_token,omitempty"`
 	EndpointsMask    string `json:"endpoints_mask,omitempty"`
+	ItaApiKey        string `json:"ita_api_key,omitempty"`
+	ItaPolicyId      string `json:"ita_policy_id,omitempty"`
 }
 
 // loadSystemInfo reads system_info.json if available, otherwise falls back to VM config
@@ -54,6 +56,13 @@ func loadSystemInfo() {
 	// fallback mask source if not set via env
 	if EndpointsMask == "" && info.EndpointsMask != "" {
 		EndpointsMask = info.EndpointsMask
+	}
+
+	if ItaApiKey == "" && info.ItaApiKey != "" {
+		ItaApiKey = info.ItaApiKey
+	}
+	if ItaPolicyId == "" && info.ItaPolicyId != "" {
+		ItaPolicyId = info.ItaPolicyId
 	}
 
 	// Print which source was used
@@ -116,6 +125,11 @@ func init() {
 	// New sensitive config from extra env
 	AccessToken = GetEnv("SECRETVM_DEV_TOKEN", "")             // header: X-Dev-Token
 	EndpointsMask = GetEnv("SECRETVM_ENDPOINTS_MASK", "01010") // bit1=docker-compose, bit3=vm-upgrades open
+	
+	ItaApiKey = GetEnv("SECRETVM_ITA_API_KEY", "")
+	ItaPolicyId = GetEnv("SECRETVM_ITA_POLICY_ID", "")
+	ItaApiUrl = GetEnv("SECRETVM_ITA_API_URL", "https://api.eu.trustauthority.intel.com/appraisal/v1/attest")
+
 	loadSystemInfo()
 
 	// Create report directory if it doesn't exist
@@ -192,4 +206,8 @@ var (
 	EnvPath        string
 	AccessToken    string
 	EndpointsMask  string
+
+	ItaApiKey      string
+	ItaPolicyId    string
+	ItaApiUrl      string
 )
