@@ -11,13 +11,19 @@ import (
 )
 
 type SystemInfo struct {
-	Env              string `json:"env"`
-	ServiceID        string `json:"service_id,omitempty"`
-	PrivateMode      bool   `json:"private_mode,omitempty"`
-	SecretVMDevToken string `json:"secretvm_dev_token,omitempty"`
-	EndpointsMask    string `json:"endpoints_mask,omitempty"`
-	ItaApiKey        string `json:"ita_api_key,omitempty"`
-	ItaPolicyId      string `json:"ita_policy_id,omitempty"`
+	Env              string                `json:"env"`
+	ServiceID        string                `json:"service_id,omitempty"`
+	PrivateMode      bool                  `json:"private_mode,omitempty"`
+	SecretVMDevToken string                `json:"secretvm_dev_token,omitempty"`
+	EndpointsMask    string                `json:"endpoints_mask,omitempty"`
+	ItaApiKey        string                `json:"ita_api_key,omitempty"`
+	ItaPolicyId      string                `json:"ita_policy_id,omitempty"`
+	ItaKeys          map[string]ItaKeyInfo `json:"ita_keys,omitempty"`
+}
+
+type ItaKeyInfo struct {
+	ApiKey   string `json:"api_key"`
+	PolicyId string `json:"policy_id"`
 }
 
 // loadSystemInfo reads system_info.json if available, otherwise falls back to VM config
@@ -58,11 +64,17 @@ func loadSystemInfo() {
 		EndpointsMask = info.EndpointsMask
 	}
 
-	if ItaApiKey == "" && info.ItaApiKey != "" {
-		ItaApiKey = info.ItaApiKey
+	// Merge ITA keys from config file (secret-vm.json) as "default" entry
+	if info.ItaApiKey != "" {
+		if _, ok := ItaKeys["default"]; !ok {
+			ItaKeys["default"] = ItaKeyInfo{
+				ApiKey:   info.ItaApiKey,
+				PolicyId: info.ItaPolicyId,
+			}
+		}
 	}
-	if ItaPolicyId == "" && info.ItaPolicyId != "" {
-		ItaPolicyId = info.ItaPolicyId
+	if len(ItaKeys) == 0 && len(info.ItaKeys) > 0 {
+		ItaKeys = info.ItaKeys
 	}
 
 	// Print which source was used
@@ -125,10 +137,16 @@ func init() {
 	// New sensitive config from extra env
 	AccessToken = GetEnv("SECRETVM_DEV_TOKEN", "")             // header: X-Dev-Token
 	EndpointsMask = GetEnv("SECRETVM_ENDPOINTS_MASK", "01010") // bit1=docker-compose, bit3=vm-upgrades open
-	
-	ItaApiKey = GetEnv("SECRETVM_ITA_API_KEY", "")
-	ItaPolicyId = GetEnv("SECRETVM_ITA_POLICY_ID", "")
+
 	ItaApiUrl = GetEnv("SECRETVM_ITA_API_URL", "https://api.eu.trustauthority.intel.com/appraisal/v1/attest")
+
+	itaKeysJson := GetEnv("SECRETVM_ITA_KEYS", "")
+	ItaKeys = make(map[string]ItaKeyInfo)
+	if itaKeysJson != "" {
+		if err := json.Unmarshal([]byte(itaKeysJson), &ItaKeys); err != nil {
+			log.Printf("Warning: Failed to parse SECRETVM_ITA_KEYS: %v", err)
+		}
+	}
 
 	loadSystemInfo()
 
@@ -207,7 +225,6 @@ var (
 	AccessToken    string
 	EndpointsMask  string
 
-	ItaApiKey      string
-	ItaPolicyId    string
-	ItaApiUrl      string
+	ItaApiUrl string
+	ItaKeys   map[string]ItaKeyInfo
 )
