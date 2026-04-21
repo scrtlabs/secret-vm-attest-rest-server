@@ -64,19 +64,16 @@ func loadSystemInfo() {
 		EndpointsMask = info.EndpointsMask
 	}
 
-	// Merge ITA keys from config file (secret-vm.json) as "default" entry
-	if info.ItaApiKey != "" {
-		if _, ok := ItaKeys["default"]; !ok {
-			ItaKeys["default"] = ItaKeyInfo{
-				ApiKey:   info.ItaApiKey,
-				PolicyId: info.ItaPolicyId,
-			}
+	// Always ensure default keys from secret-vm.json are present
+	// This prevents user-supplied keys from overwriting SLabs default keys
+	if len(info.ItaKeys) > 0 {
+		if ItaKeys == nil {
+			ItaKeys = make(map[string]ItaKeyInfo)
+		}
+		for k, v := range info.ItaKeys {
+			ItaKeys[k] = v
 		}
 	}
-	if len(ItaKeys) == 0 && len(info.ItaKeys) > 0 {
-		ItaKeys = info.ItaKeys
-	}
-
 	// Print which source was used
 	switch src {
 	case "system_info":
