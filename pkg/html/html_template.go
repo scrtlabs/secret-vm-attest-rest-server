@@ -232,3 +232,100 @@ const HtmlTemplate = `<!DOCTYPE html>
     </script>
 </body>
 </html>`
+
+// MultiItemHtmlTemplate holds the HTML structure for pages displaying multiple items (like multiple JWTs).
+const MultiItemHtmlTemplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <link rel="icon" href="/images/favicon.png" type="image/png">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e1e; color: #e0e0e0; margin: 0; padding: 20px; display: flex; flex-direction: column; min-height: 100vh; }
+        .container { max-width: 1000px; margin: 0 auto; width: 100%; }
+        header { display: flex; align-items: center; margin-bottom: 30px; }
+        .logo { width: 40px; height: auto; margin-right: 12px; }
+        h1 { font-size: 32px; font-weight: 500; margin: 0; padding: 0; color: #ffffff; }
+        p.description { color: #a0a0a0; margin-top: 8px; }
+        .item-section { margin-bottom: 20px; }
+        .item-title { font-size: 18px; color: #ffffff; margin-bottom: 8px; font-weight: bold; }
+        .quote-container { position: relative; background-color: #252525; border-radius: 8px; border: 1px solid #333; overflow: hidden; }
+        .quote-textarea { width: 100%; min-height: 80px; background-color: #252525; color: #e0e0e0; border: none; padding: 16px; font-family: 'Consolas', 'Courier New', monospace; font-size: 14px; line-height: 1.5; box-sizing: border-box; outline: none; overflow-x: auto; white-space: pre-wrap; word-break: break-all; margin: 0; }
+        .button-container { position: absolute; top: 8px; right: 8px; }
+        .copy-button { background-color: #2c2c2c; color: #e0e0e0; border: 1px solid #444; border-radius: 4px; padding: 6px 12px; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
+        .copy-button:hover { background-color: #3a3a3a; }
+        .copy-button:active { background-color: #444; }
+        .copy-icon { width: 16px; height: 16px; }
+        .toast { position: fixed; bottom: 20px; right: 20px; background-color: #333; color: white; padding: 12px 20px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: none; z-index: 1000; }
+        .toast.show { display: block; animation: fadeInOut 2s ease; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="/images/favicon.png" alt="Logo" class="logo">
+            <div>
+                <h1>{{.Title}}</h1>
+                <p class="description">{{.Description}}</p>
+            </div>
+        </header>
+        {{range .Items}}
+        <div class="item-section">
+            <div class="item-title">Key: {{.Title}}</div>
+            <div class="quote-container">
+                <pre class="quote-textarea">{{.Content}}</pre>
+                <div class="button-container">
+                    <button class="copy-button">
+                        <svg class="copy-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copy
+                    </button>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    <div class="toast" id="toast">Copied to clipboard</div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const toast = document.getElementById("toast");
+            document.querySelectorAll(".copy-button").forEach(button => {
+                button.addEventListener("click", function() {
+                    const container = this.closest(".quote-container");
+                    const textToCopy = container.querySelector(".quote-textarea").textContent;
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(textToCopy).then(() => showToast()).catch(err => fallbackCopy(textToCopy));
+                    } else {
+                        fallbackCopy(textToCopy);
+                    }
+                });
+            });
+
+            function showToast() {
+                toast.classList.add("show");
+                setTimeout(() => toast.classList.remove("show"), 2000);
+            }
+
+            function fallbackCopy(text) {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand("copy");
+                    showToast();
+                } catch (err) {
+                    console.error("Fallback error", err);
+                }
+                document.body.removeChild(textArea);
+            }
+        });
+    </script>
+</body>
+</html>`

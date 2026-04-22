@@ -700,21 +700,33 @@ func MakeItaJwtHTMLHandler() http.HandlerFunc {
 			return
 		}
 
-		tokensJson, _ := json.MarshalIndent(tokens, "", "  ")
+		type JwtItem struct {
+			Title   string
+			Content string
+		}
+		var items []JwtItem
+		for _, t := range tokens {
+			content := t.Token
+			if content == "" && t.Error != "" {
+				content = "Error: " + t.Error
+			}
+			items = append(items, JwtItem{
+				Title:   t.KeyName,
+				Content: content,
+			})
+		}
 
 		data := struct {
 			Title       string
 			Description string
-			Quote       string
-			ShowVerify  bool
+			Items       []JwtItem
 		}{
 			Title:       "Intel Trust Authority JWTs",
 			Description: "Below are the dynamically fetched Intel Trust Authority JWTs across all configured policies.",
-			Quote:       string(tokensJson),
-			ShowVerify:  false,
+			Items:       items,
 		}
 
-		tmpl, err := template.New("itaJwtHtml").Parse(htmlpkg.HtmlTemplate)
+		tmpl, err := template.New("itaJwtHtml").Parse(htmlpkg.MultiItemHtmlTemplate)
 		if err != nil {
 			log.Printf("Error parsing HTML template: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
