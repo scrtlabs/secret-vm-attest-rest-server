@@ -677,7 +677,7 @@ func MakeItaJwtHandler() http.HandlerFunc {
 		}
 
 		// Check if ITA JWT is enabled via env var or ITA keys being configured
-		if os.Getenv("SECRETVM_ENABLE_ITA_JWT") == "" && len(ItaKeys) == 0 {
+		if os.Getenv("SECRETVM_ENABLE_ITA_JWT") == "" {
 			respondWithError(w, http.StatusNotFound, "ITA JWT not enabled", "ITA JWT attestation is not enabled for this VM")
 			return
 		}
@@ -700,7 +700,7 @@ func MakeItaJwtHTMLHandler() http.HandlerFunc {
 			return
 		}
 
-		if os.Getenv("SECRETVM_ENABLE_ITA_JWT") == "" && len(ItaKeys) == 0 {
+		if os.Getenv("SECRETVM_ENABLE_ITA_JWT") == "" {
 			respondWithError(w, http.StatusNotFound, "ITA JWT not enabled", "ITA JWT attestation is not enabled for this VM")
 			return
 		}
