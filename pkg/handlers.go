@@ -3,9 +3,12 @@ package pkg
 import (
 	"bytes"
 	"embed"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -15,6 +18,7 @@ import (
 	htmlpkg "secret-vm-attest-rest-server/pkg/html"
 	"sort"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 
@@ -121,11 +125,14 @@ func MakeAttestationHTMLHandler(fileName, attestationType string) http.HandlerFu
 			return
 		}
 
-		// Determine Title and Description per type (Self uses "Report")
+		// Determine Title and Description per type
 		var titleText, descText string
 		if attestationType == "Self" {
 			titleText = fmt.Sprintf("%s Attestation Report", attestationType)
 			descText = fmt.Sprintf("Below is the %s attestation report. Click the copy button to copy it to your clipboard.", attestationType)
+		} else if attestationType == "Proof of Cloud" {
+			titleText = "Proof of Cloud JWT"
+			descText = "Below is the Proof of Cloud JWT. Click the copy button to copy it to your clipboard."
 		} else {
 			titleText = fmt.Sprintf("%s Attestation Quote", attestationType)
 			descText = fmt.Sprintf("Below is the %s attestation quote. Click the copy button to copy it to your clipboard.", attestationType)
@@ -576,4 +583,270 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(code)
 	w.Write(response)
+}
+
+type ItaTokenResponse struct {
+	KeyName string `json:"key_name"`
+	Token   string `json:"token,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+func fetchItaJwt() ([]ItaTokenResponse, error, int) {
+	if len(ItaKeys) == 0 {
+		return nil, fmt.Errorf("no ITA API keys configured"), http.StatusInternalServerError
+	}
+	if len(ItaKeys) > 3 {
+		return nil, fmt.Errorf("too many ITA API keys configured (max 3)"), http.StatusBadRequest
+	}
+
+	quoteFilePath := filepath.Join(ReportDir, CPUAttestationFile)
+	rawQuote, err := os.ReadFile(quoteFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read raw quote: %v", err), http.StatusInternalServerError
+	}
+
+	hexStr := strings.TrimSpace(string(rawQuote))
+	quoteBytes, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode hex quote: %v", err), http.StatusInternalServerError
+	}
+	b64Quote := base64.StdEncoding.EncodeToString(quoteBytes)
+
+	var results []ItaTokenResponse
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	for keyName, keyInfo := range ItaKeys {
+		if keyInfo.ApiKey == "" || keyInfo.PolicyId == "" {
+			results = append(results, ItaTokenResponse{KeyName: keyName, Error: "ITA API Key or Policy ID is empty"})
+			continue
+		}
+
+		payload := map[string]interface{}{
+			"quote":      b64Quote,
+			"policy_ids": []string{keyInfo.PolicyId},
+		}
+		payloadBytes, _ := json.Marshal(payload)
+
+		req, err := http.NewRequest("POST", ItaApiUrl, bytes.NewBuffer(payloadBytes))
+		if err != nil {
+			results = append(results, ItaTokenResponse{KeyName: keyName, Error: fmt.Sprintf("failed to create request: %v", err)})
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("x-api-key", keyInfo.ApiKey)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			results = append(results, ItaTokenResponse{KeyName: keyName, Error: fmt.Sprintf("failed to contact ITA API: %v", err)})
+			continue
+		}
+
+		respBody, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if readErr != nil {
+			results = append(results, ItaTokenResponse{KeyName: keyName, Error: fmt.Sprintf("failed to read ITA response: %v", readErr)})
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			results = append(results, ItaTokenResponse{KeyName: keyName, Error: fmt.Sprintf("ITA API returned status %d: %s", resp.StatusCode, string(respBody))})
+			continue
+		}
+
+		var itaResp struct {
+			Token string `json:"token"`
+		}
+		if err := json.Unmarshal(respBody, &itaResp); err != nil || itaResp.Token == "" {
+			results = append(results, ItaTokenResponse{KeyName: keyName, Error: "invalid ITA response format or empty token"})
+			continue
+		}
+
+		results = append(results, ItaTokenResponse{KeyName: keyName, Token: itaResp.Token})
+	}
+
+	return results, nil, http.StatusOK
+}
+
+// MakeItaJwtHandler dynamically fetches the ITA JWT token(s)
+func MakeItaJwtHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
+			return
+		}
+
+		// Check if ITA JWT is enabled via env var or ITA keys being configured
+		if os.Getenv("SECRETVM_ENABLE_ITA_JWT") == "" {
+			respondWithError(w, http.StatusNotFound, "ITA JWT not enabled", "ITA JWT attestation is not enabled for this VM")
+			return
+		}
+
+		tokens, err, code := fetchItaJwt()
+		if err != nil {
+			respondWithError(w, code, "Failed to fetch ITA JWT(s)", err.Error())
+			return
+		}
+
+		respondWithJSON(w, http.StatusOK, tokens)
+	}
+}
+
+// MakeItaJwtHTMLHandler dynamically fetches and renders the ITA JWT token(s).
+func MakeItaJwtHTMLHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
+			return
+		}
+
+		if os.Getenv("SECRETVM_ENABLE_ITA_JWT") == "" {
+			respondWithError(w, http.StatusNotFound, "ITA JWT not enabled", "ITA JWT attestation is not enabled for this VM")
+			return
+		}
+
+		tokens, err, code := fetchItaJwt()
+		if err != nil {
+			respondWithError(w, code, "Failed to fetch ITA JWT", err.Error())
+			return
+		}
+
+		type JwtItem struct {
+			Title   string
+			Content string
+		}
+		var items []JwtItem
+		for _, t := range tokens {
+			content := t.Token
+			if content == "" && t.Error != "" {
+				content = "Error: " + t.Error
+			}
+			items = append(items, JwtItem{
+				Title:   t.KeyName,
+				Content: content,
+			})
+		}
+
+		data := struct {
+			Title       string
+			Description string
+			Items       []JwtItem
+		}{
+			Title:       "Intel Trust Authority JWTs",
+			Description: "Below are the dynamically fetched Intel Trust Authority JWTs across all configured policies.",
+			Items:       items,
+		}
+
+		tmpl, err := template.New("itaJwtHtml").Parse(htmlpkg.MultiItemHtmlTemplate)
+		if err != nil {
+			log.Printf("Error parsing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := tmpl.Execute(w, data); err != nil {
+			log.Printf("Error executing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	}
+}
+
+func fetchPocJwt() (string, error, int) {
+	quoteFilePath := filepath.Join(ReportDir, CPUAttestationFile)
+	if _, err := os.Stat(quoteFilePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("quote file not found: %s", quoteFilePath), http.StatusInternalServerError
+	}
+
+	cmd := exec.Command("get_poc_token.sh", quoteFilePath)
+	var outBuffer bytes.Buffer
+	var errBuffer bytes.Buffer
+	cmd.Stdout = &outBuffer
+	cmd.Stderr = &errBuffer
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to execute get_poc_token.sh: %v. Stderr: %s", err, errBuffer.String()), http.StatusInternalServerError
+	}
+
+	var result struct {
+		Jwt string `json:"jwt"`
+	}
+	if err := json.Unmarshal(outBuffer.Bytes(), &result); err != nil {
+		return "", fmt.Errorf("invalid json from get_poc_token.sh output: %v. Output: %s", err, outBuffer.String()), http.StatusInternalServerError
+	}
+	if result.Jwt == "" {
+		return "", fmt.Errorf("empty jwt returned by get_poc_token.sh"), http.StatusInternalServerError
+	}
+
+	return result.Jwt, nil, http.StatusOK
+}
+
+// MakePocJwtHandler dynamically fetches the PoC JWT token.
+func MakePocJwtHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
+			return
+		}
+
+		if os.Getenv("SECRETVM_ENABLE_POC_JWT") == "" {
+			respondWithError(w, http.StatusNotFound, "PoC JWT not enabled", "Proof of Cloud JWT is not enabled for this VM")
+			return
+		}
+
+		token, err, code := fetchPocJwt()
+		if err != nil {
+			respondWithError(w, code, "Failed to fetch Proof of Cloud JWT", err.Error())
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(token))
+	}
+}
+
+// MakePocJwtHTMLHandler dynamically fetches and renders the PoC JWT token.
+func MakePocJwtHTMLHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only GET requests are supported")
+			return
+		}
+
+		if os.Getenv("SECRETVM_ENABLE_POC_JWT") == "" {
+			respondWithError(w, http.StatusNotFound, "PoC JWT not enabled", "Proof of Cloud JWT is not enabled for this VM")
+			return
+		}
+
+		token, err, code := fetchPocJwt()
+		if err != nil {
+			respondWithError(w, code, "Failed to fetch Proof of Cloud JWT", err.Error())
+			return
+		}
+
+		data := struct {
+			Title       string
+			Description string
+			Quote       string
+			ShowVerify  bool
+		}{
+			Title:       "Proof of Cloud JWT",
+			Description: "Below is the dynamically fetched Proof of Cloud JWT. Click the copy button to copy it.",
+			Quote:       token,
+			ShowVerify:  false,
+		}
+
+		tmpl, err := template.New("pocJwtHtml").Parse(htmlpkg.HtmlTemplate)
+		if err != nil {
+			log.Printf("Error parsing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := tmpl.Execute(w, data); err != nil {
+			log.Printf("Error executing HTML template: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	}
 }
