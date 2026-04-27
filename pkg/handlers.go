@@ -3,6 +3,8 @@ package pkg
 import (
 	"bytes"
 	"embed"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -15,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"secret-vm-attest-rest-server/pkg/certs"
 	htmlpkg "secret-vm-attest-rest-server/pkg/html"
 	"sort"
 	"strconv"
@@ -613,7 +616,22 @@ func fetchItaJwt() ([]ItaTokenResponse, error, int) {
 	b64Quote := base64.StdEncoding.EncodeToString(quoteBytes)
 
 	var results []ItaTokenResponse
-	client := &http.Client{Timeout: 10 * time.Second}
+	// Create a custom cert pool using system certs as a base
+	rootCAs, _ := x509.SystemCertPool()
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+	// Append the embedded Intel Root CA to guarantee it's available
+	rootCAs.AppendCertsFromPEM(certs.IntelRootCA)
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: rootCAs,
+			},
+		},
+	}
 
 	for keyName, keyInfo := range ItaKeys {
 		if keyInfo.ApiKey == "" || len(keyInfo.PolicyIds) == 0 {
