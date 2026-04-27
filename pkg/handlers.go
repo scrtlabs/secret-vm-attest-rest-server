@@ -616,14 +616,14 @@ func fetchItaJwt() ([]ItaTokenResponse, error, int) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	for keyName, keyInfo := range ItaKeys {
-		if keyInfo.ApiKey == "" || keyInfo.PolicyId == "" {
-			results = append(results, ItaTokenResponse{KeyName: keyName, Error: "ITA API Key or Policy ID is empty"})
+		if keyInfo.ApiKey == "" || len(keyInfo.PolicyIds) == 0 {
+			results = append(results, ItaTokenResponse{KeyName: keyName, Error: "ITA API Key or Policy ID(s) are empty"})
 			continue
 		}
 
 		payload := map[string]interface{}{
 			"quote":      b64Quote,
-			"policy_ids": []string{keyInfo.PolicyId},
+			"policy_ids": keyInfo.PolicyIds,
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
