@@ -492,14 +492,19 @@ func MakeVMLogsHandler(secure bool) http.HandlerFunc {
 			}
 		}
 
+		fmt.Println("CHECK0")
 		// Collect docker logs (only in secure mode)
 		if secure {
+		fmt.Println("CHECK1")
 			if service != "" && service != "secretvm" {
+		fmt.Println("CHECK2")
 				// Logs for a single container
 				if ll, err := fetchDockerLogsForContainer(service, lines, hostName); err == nil {
 					sort.Slice(ll, func(i, j int) bool { return ll[i].Timestamp.Before(ll[j].Timestamp) })
 					writeLogsResponse(w, ll)
 					return
+				} else {
+				fmt.Println("ERROR", err)
 				}
 			} else {
 				// Logs for all containers

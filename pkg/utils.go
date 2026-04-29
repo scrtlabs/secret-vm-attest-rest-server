@@ -250,7 +250,9 @@ func formatDockerAsJournal(ts time.Time, host, container string, pid int, msg st
 // It converts docker ISO timestamps into journalctl-like lines.
 func fetchDockerLogsForContainer(container string, lines int, hostName string) ([]LogLine, error) {
 	linesArg := "--tail=" + strconv.Itoa(lines)
-	out, err := exec.Command("docker", "logs", "--timestamps", linesArg, container).Output()
+	out, err := exec.Command("docker", "logs", "--timestamps", linesArg, container).CombinedOutput()
+	fmt.Println("OUT", out)
+	fmt.Println("ERR", err)
 	if err != nil {
 		return nil, err
 	}
