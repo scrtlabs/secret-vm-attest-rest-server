@@ -16,14 +16,12 @@ type SystemInfo struct {
 	PrivateMode      bool                  `json:"private_mode,omitempty"`
 	SecretVMDevToken string                `json:"secretvm_dev_token,omitempty"`
 	EndpointsMask    string                `json:"endpoints_mask,omitempty"`
-	ItaApiKey        string                `json:"ita_api_key,omitempty"`
-	ItaPolicyId      string                `json:"ita_policy_id,omitempty"`
 	ItaKeys          map[string]ItaKeyInfo `json:"ita_keys,omitempty"`
 }
 
 type ItaKeyInfo struct {
-	ApiKey   string `json:"api_key"`
-	PolicyId string `json:"policy_id"`
+	ApiKey    string   `json:"api_key"`
+	PolicyIds []string `json:"policy_ids"`
 }
 
 // loadSystemInfo reads system_info.json if available, otherwise falls back to VM config
