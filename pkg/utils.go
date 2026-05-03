@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -101,49 +102,22 @@ func formatBytes(b uint64) string {
 }
 
 func getStatus() (string, error) {
-	startupStatus, err := runCommand("systemctl", "show", "secret-vm-startup", "--property=SubState", "--value")
+	data, err := os.ReadFile("/var/run/svm_status")
 	if err != nil {
-		return "", fmt.Errorf("could not get secret-vm-startup status: %w", err)
-	}
-
-	if startupStatus == "start" {
-		return "initializing", nil
-	}
-
-	if startupStatus == "failed" {
-		return "init_failed", nil
-	}
-
-	dockerServiceStatus, err := runCommand("systemctl", "show", "secret-vm-docker-start", "--property=SubState", "--value")
-	if err != nil {
-		return "", fmt.Errorf("could not get secret-vm-docker-start status: %w", err)
-	}
-
-	switch dockerServiceStatus {
-	case "failed":
-		return "prep_failed", nil
-	case "running":
-		dockerPsOutput, err := runCommand("docker", "ps", "-q")
-		if err != nil {
-			return "", fmt.Errorf("failed to execute 'docker ps -q': %w", err)
+		if os.IsNotExist(err) {
+			return "unknown", nil
 		}
-
-		if dockerPsOutput != "" {
-			return "running", nil
-		} else {
-			return "preparing", nil
-		}
-	case "dead":
-		journalOutput, _ := runCommand("journalctl", "-u", "secret-vm-docker-start", "--no-pager")
-
-		if strings.Contains(journalOutput, "exited with code 0") {
-			return "exited", nil
-		} else {
-			return "crashed", nil
-		}
+		return "", fmt.Errorf("could not read orchestrator status: %w", err)
 	}
 
-	return "unknown", nil
+	status := strings.TrimSpace(string(data))
+
+	switch status {
+	case "initializing", "init_failed", "preparing", "running", "crashed", "exited":
+		return status, nil
+	default:
+		return "unknown", nil
+	}
 }
 
 // LogLine represents a single log line with its parsed timestamp.
@@ -176,10 +150,8 @@ var (
 func fetchServicesLogs() (string, error) {
 	var buf bytes.Buffer
 	cmd := exec.Command("journalctl",
-		"-u", "secret-vm-network-setup",
-		"-u", "secret-vm-startup",
+		"-u", "secret-vm-supervisor",
 		"-u", "secret-vm-attest-rest",
-		"-u", "secret-vm-docker-start",
 		"--no-pager")
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
@@ -246,6 +218,7 @@ func listAllDockerContainerNames() ([]string, error) {
 func formatDockerAsJournal(ts time.Time, host, container string, pid int, msg string) string {
 	return fmt.Sprintf("%s %s %s[%d]: %s", ts.Local().Format("Jan 2 15:04:05"), host, container, pid, msg)
 }
+
 // fetchDockerLogsForContainer retrieves logs for a specific container with timestamps.
 // It converts docker ISO timestamps into journalctl-like lines.
 func fetchDockerLogsForContainer(container string, lines int, hostName string) ([]LogLine, error) {
