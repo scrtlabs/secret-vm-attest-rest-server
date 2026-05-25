@@ -17,6 +17,8 @@ type SystemInfo struct {
 	SecretVMDevToken string                `json:"secretvm_dev_token,omitempty"`
 	EndpointsMask    string                `json:"endpoints_mask,omitempty"`
 	ItaKeys          map[string]ItaKeyInfo `json:"ita_keys,omitempty"`
+	EnableItaJwt     bool                  `json:"enable_ita_jwt,omitempty"`
+	EnablePocJwt     bool                  `json:"enable_poc_jwt,omitempty"`
 }
 
 type ItaKeyInfo struct {
@@ -56,6 +58,9 @@ func loadSystemInfo() {
 	if AccessToken == "" && info.SecretVMDevToken != "" {
 		AccessToken = info.SecretVMDevToken
 	}
+
+	EnableItaJwt = info.EnableItaJwt
+	EnablePocJwt = info.EnablePocJwt
 
 	// fallback mask source if not set via env
 	if EndpointsMask == "" && info.EndpointsMask != "" {
@@ -222,4 +227,6 @@ var (
 
 	ItaApiUrl string
 	ItaKeys   map[string]ItaKeyInfo
+	EnableItaJwt bool
+	EnablePocJwt bool
 )
