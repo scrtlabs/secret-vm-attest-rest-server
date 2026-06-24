@@ -2,9 +2,9 @@ package pkg
 
 import (
 	"bytes"
-	"embed"
 	"crypto/tls"
 	"crypto/x509"
+	"embed"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -569,6 +569,18 @@ func respondWithError(w http.ResponseWriter, code int, error string, details str
 	})
 }
 
+// truncateForLog bounds untrusted/upstream-controlled strings before they are
+// written to the server log (which is exposed via the /logs endpoint), so a
+// large or sensitive response body cannot flood or leak through the journal.
+// The full content is still returned to the caller in the HTTP error response.
+func truncateForLog(s string, max int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + fmt.Sprintf("... [truncated %d bytes]", len(s)-max)
+}
+
 // Helper function to respond with JSON data.
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	// Convert payload to JSON
@@ -599,18 +611,24 @@ func fetchItaJwt() ([]ItaTokenResponse, error, int) {
 		return nil, fmt.Errorf("no ITA API keys configured"), http.StatusInternalServerError
 	}
 	if len(ItaKeys) > 3 {
-		return nil, fmt.Errorf("too many ITA API keys configured (max 3)"), http.StatusBadRequest
+		err := fmt.Errorf("too many ITA API keys configured (max 3)")
+		log.Printf("ITA JWT: error: %v", err)
+		return nil, err, http.StatusBadRequest
 	}
+
+	log.Printf("ITA JWT: Fetching token(s) for %d configured key(s)", len(ItaKeys))
 
 	quoteFilePath := filepath.Join(ReportDir, CPUAttestationFile)
 	rawQuote, err := os.ReadFile(quoteFilePath)
 	if err != nil {
+		log.Printf("ITA JWT: Failed to read raw quote from %q: %v", quoteFilePath, err)
 		return nil, fmt.Errorf("failed to read raw quote: %v", err), http.StatusInternalServerError
 	}
 
 	hexStr := strings.TrimSpace(string(rawQuote))
 	quoteBytes, err := hex.DecodeString(hexStr)
 	if err != nil {
+		log.Printf("ITA JWT: Failed to decode hex quote: %v", err)
 		return nil, fmt.Errorf("failed to decode hex quote: %v", err), http.StatusInternalServerError
 	}
 	b64Quote := base64.StdEncoding.EncodeToString(quoteBytes)
@@ -635,6 +653,7 @@ func fetchItaJwt() ([]ItaTokenResponse, error, int) {
 
 	for keyName, keyInfo := range ItaKeys {
 		if keyInfo.ApiKey == "" || len(keyInfo.PolicyIds) == 0 {
+			log.Printf("ITA JWT: Skipping key %q (ApiKey or PolicyIds empty)", keyName)
 			results = append(results, ItaTokenResponse{KeyName: keyName, Error: "ITA API Key or Policy ID(s) are empty"})
 			continue
 		}
@@ -645,8 +664,10 @@ func fetchItaJwt() ([]ItaTokenResponse, error, int) {
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
+		log.Printf("ITA JWT: Requesting token for key %q from %s", keyName, ItaApiUrl)
 		req, err := http.NewRequest("POST", ItaApiUrl, bytes.NewBuffer(payloadBytes))
 		if err != nil {
+			log.Printf("ITA JWT: Failed to create request for key %q: %v", keyName, err)
 			results = append(results, ItaTokenResponse{KeyName: keyName, Error: fmt.Sprintf("failed to create request: %v", err)})
 			continue
 		}
@@ -656,6 +677,7 @@ func fetchItaJwt() ([]ItaTokenResponse, error, int) {
 
 		resp, err := client.Do(req)
 		if err != nil {
+			log.Printf("ITA JWT: Failed to contact ITA API for key %q: %v", keyName, err)
 			results = append(results, ItaTokenResponse{KeyName: keyName, Error: fmt.Sprintf("failed to contact ITA API: %v", err)})
 			continue
 		}
@@ -663,11 +685,13 @@ func fetchItaJwt() ([]ItaTokenResponse, error, int) {
 		respBody, readErr := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if readErr != nil {
+			log.Printf("ITA JWT: Failed to read ITA response for key %q: %v", keyName, readErr)
 			results = append(results, ItaTokenResponse{KeyName: keyName, Error: fmt.Sprintf("failed to read ITA response: %v", readErr)})
 			continue
 		}
 
 		if resp.StatusCode != http.StatusOK {
+			log.Printf("ITA JWT: API returned status %d for key %q: %s", resp.StatusCode, keyName, truncateForLog(string(respBody), 256))
 			results = append(results, ItaTokenResponse{KeyName: keyName, Error: fmt.Sprintf("ITA API returned status %d: %s", resp.StatusCode, string(respBody))})
 			continue
 		}
@@ -676,10 +700,12 @@ func fetchItaJwt() ([]ItaTokenResponse, error, int) {
 			Token string `json:"token"`
 		}
 		if err := json.Unmarshal(respBody, &itaResp); err != nil || itaResp.Token == "" {
+			log.Printf("ITA JWT: Invalid response format or empty token for key %q", keyName)
 			results = append(results, ItaTokenResponse{KeyName: keyName, Error: "invalid ITA response format or empty token"})
 			continue
 		}
 
+		log.Printf("ITA JWT: Successfully retrieved token for key %q", keyName)
 		results = append(results, ItaTokenResponse{KeyName: keyName, Token: itaResp.Token})
 	}
 
@@ -770,8 +796,11 @@ func MakeItaJwtHTMLHandler() http.HandlerFunc {
 }
 
 func fetchPocJwt() (string, error, int) {
+	log.Printf("PoC JWT: Fetching token via get_poc_token.sh")
+
 	quoteFilePath := filepath.Join(ReportDir, CPUAttestationFile)
 	if _, err := os.Stat(quoteFilePath); os.IsNotExist(err) {
+		log.Printf("PoC JWT: Quote file not found: %s", quoteFilePath)
 		return "", fmt.Errorf("quote file not found: %s", quoteFilePath), http.StatusInternalServerError
 	}
 
@@ -782,6 +811,7 @@ func fetchPocJwt() (string, error, int) {
 	cmd.Stderr = &errBuffer
 
 	if err := cmd.Run(); err != nil {
+		log.Printf("PoC JWT: Failed to execute get_poc_token.sh: %v. Stderr: %s", err, truncateForLog(errBuffer.String(), 256))
 		return "", fmt.Errorf("failed to execute get_poc_token.sh: %v. Stderr: %s", err, errBuffer.String()), http.StatusInternalServerError
 	}
 
@@ -789,12 +819,15 @@ func fetchPocJwt() (string, error, int) {
 		Jwt string `json:"jwt"`
 	}
 	if err := json.Unmarshal(outBuffer.Bytes(), &result); err != nil {
+		log.Printf("PoC JWT: Invalid json from get_poc_token.sh output: %v", err)
 		return "", fmt.Errorf("invalid json from get_poc_token.sh output: %v. Output: %s", err, outBuffer.String()), http.StatusInternalServerError
 	}
 	if result.Jwt == "" {
+		log.Printf("PoC JWT: Empty jwt returned by get_poc_token.sh")
 		return "", fmt.Errorf("empty jwt returned by get_poc_token.sh"), http.StatusInternalServerError
 	}
 
+	log.Printf("PoC JWT: Successfully retrieved token")
 	return result.Jwt, nil, http.StatusOK
 }
 
