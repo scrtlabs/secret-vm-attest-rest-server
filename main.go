@@ -79,6 +79,9 @@ func main() {
 	mux.Handle("/publickey_ed25519.html", pkg.MakePublicKeyHTMLHandler(pkg.PublicKeyEd25519Path, "ed25519"))
 	mux.Handle("/publickey_secp256k1.html", pkg.MakePublicKeyHTMLHandler(pkg.PublicKeySecp256k1Path, "secp256k1"))
 
+	// Mirror every registered endpoint under /.well-known/ as well.
+	mux.Handle("/.well-known/", http.StripPrefix("/.well-known", mux))
+
 	// Apply middleware chain - order matters here
 	// First CORS, then security headers, and finally logging
 	handler := pkg.LoggingMiddleware(

@@ -27,6 +27,10 @@ SecretVM Attest REST Server is a lightweight REST server implemented in Go. It p
 | `/publickey_secp256k1`          | GET    | Returns the secp256k1 Public Key used for Verifiable Message Signing. |
 | `/publickey_secp256k1.html`     | GET    | Returns the secp256k1 Public Key used for Verifiable Message Signing with HTML formatting.                                               |
 
+### Well-known mirror
+
+Every endpoint above is also served under `/.well-known/` (e.g. `/.well-known/cpu`, `/.well-known/status`, `/.well-known/ita-jwt`). The `/.well-known/<name>` path serves identical content to the corresponding root path `/<name>`; the original root paths remain available unchanged, and access-restricted endpoints stay protected under the mirror as well.
+
 ## Features
 
 - **Secure Communication:** Supports HTTPS with TLS certificates.
