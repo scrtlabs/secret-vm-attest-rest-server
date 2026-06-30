@@ -73,6 +73,14 @@ The server configuration is managed in the `pkg/config.go` file. It uses [godote
 - **SECRETVM_REST_SERVER_PORT**: Port for the server (default: `29343`).
 - **SECRETVM_CERT_PATH**: Path to SSL certificate file (default: `cert/ssl_cert.pem`).
 - **SECRETVM_KEY_PATH**: Path to SSL key file (default: `cert/ssl_key.pem`).
+- **SECRETVM_PRIVATE_MODE**: Require a bearer token, `X-Dev-Token`, query
+  token, or explicit endpoint-mask opening for private endpoints (default:
+  `true`).
+- **SECRETVM_DEV_TOKEN**: Token accepted by private endpoints when private mode
+  is enabled.
+- **SECRETVM_ENDPOINTS_MASK**: Five-character mask controlling unauthenticated
+  access to private endpoint groups (default: `01010`: `/docker-compose` and
+  `/vm_upgrades` are open; `/logs`, `/services`, and `/resources` are closed).
 
 ### Attestation Configuration
 - **SECRETVM_ATTEST_TOOL**: Command name for the attestation tool (default: `attest_tool`).
@@ -92,6 +100,9 @@ SECRETVM_SECURE=true
 SECRETVM_REST_SERVER_PORT=29343
 SECRETVM_CERT_PATH=cert/ssl_cert.pem
 SECRETVM_KEY_PATH=cert/ssl_key.pem
+SECRETVM_PRIVATE_MODE=true
+SECRETVM_DEV_TOKEN=change-me
+SECRETVM_ENDPOINTS_MASK=01010
 SECRETVM_ATTEST_TOOL=attest_tool
 SECRETVM_ATTEST_TIMEOUT_SEC=10
 ```
@@ -279,5 +290,4 @@ SECRETVM_ATTEST_TIMEOUT_SEC=10
 ### `/publickey_secp256k1` & `/publickey_ed25519`
 * **Method:** `GET`
 * **Description:** Renders the public keys of used for Verifiable Message Signing. The respective .html endpoints render the same keys with HTML formatting
-
 

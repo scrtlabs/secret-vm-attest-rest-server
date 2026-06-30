@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"html"
 	"io"
 	"log"
 	"math"
@@ -260,11 +259,10 @@ func MakeDockerComposeFileHandler() http.HandlerFunc {
 			return
 		}
 
-		// Serve as HTML with pre tag to preserve trailing newlines
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{background:#1e1e1e;color:#e0e0e0;margin:0;padding:10px;font-family:monospace}pre{margin:0;white-space:pre}</style></head><body><pre>%s&#8203;</pre><script>document.oncopy=function(e){var s=window.getSelection().toString();if(s.endsWith('\u200B')){e.preventDefault();e.clipboardData.setData('text/plain',s.slice(0,-1))}}</script></body></html>`, html.EscapeString(string(content)))
+		w.Write(content)
 	}
 }
 

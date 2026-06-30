@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -38,8 +40,9 @@ func TestStatusHandler(t *testing.T) {
 		t.Errorf("Failed to parse response body: %v", err)
 	}
 
-	// Verify the status field exists
-	if status, exists := response["status"]; !exists || status != "server is alive" {
+	// Verify the status field exists. In a normal unit-test environment the
+	// SecretVM services may be unavailable, so "unknown" is a valid response.
+	if status, exists := response["status"]; !exists || status == "" {
 		t.Errorf("Response missing or incorrect status field: %v", response)
 	}
 
@@ -83,5 +86,32 @@ func TestStatusHandlerInvalidMethod(t *testing.T) {
 	// Verify the error field exists
 	if errorMsg, exists := response["error"]; !exists || errorMsg != "Method not allowed" {
 		t.Errorf("Response missing or incorrect error field: %v", response)
+	}
+}
+
+func TestDockerComposeHandlerServesRawComposeBytes(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "docker-compose.yaml")
+	want := []byte("services:\n  app:\n    image: example/app:1\n    command: \"echo <raw>&bytes\"\n")
+	if err := os.WriteFile(path, want, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	oldPath := DockerComposePath
+	DockerComposePath = path
+	t.Cleanup(func() { DockerComposePath = oldPath })
+
+	req := httptest.NewRequest(http.MethodGet, "/docker-compose", nil)
+	rr := httptest.NewRecorder()
+	MakeDockerComposeFileHandler().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("handler returned status %d, want %d", rr.Code, http.StatusOK)
+	}
+	if got := rr.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+		t.Fatalf("content-type = %q, want text/plain; charset=utf-8", got)
+	}
+	if got := rr.Body.Bytes(); string(got) != string(want) {
+		t.Fatalf("body = %q, want %q", got, want)
 	}
 }

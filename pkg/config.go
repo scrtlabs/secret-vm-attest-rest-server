@@ -105,6 +105,7 @@ func init() {
 	ReportDir = GetEnv("SECRETVM_REPORT_DIR", "reports")
 	RESTServerIP = GetEnv("SECRETVM_REST_SERVER_IP", "0.0.0.0")
 	Secure = GetBool("SECRETVM_SECURE", true)
+	PrivateMode = GetBool("SECRETVM_PRIVATE_MODE", true)
 	Port = GetInt("SECRETVM_REST_SERVER_PORT", 29343)
 
 	// Certificate paths
@@ -134,7 +135,7 @@ func init() {
 	PublicKeyEd25519Path = GetEnv("SECRETVM_PUBLIC_KEY_ED25519", "/mnt/secure/docker_wd/crypto/docker_public_key_ed25519.pem")
 	PublicKeySecp256k1Path = GetEnv("SECRETVM_PUBLIC_KEY_SECP256K1", "/mnt/secure/docker_wd/crypto/docker_public_key_secp256k1.pem")
 
-	// New sensitive config from extra env
+	// Private endpoint access from extra env
 	AccessToken = GetEnv("SECRETVM_DEV_TOKEN", "")             // header: X-Dev-Token
 	EndpointsMask = GetEnv("SECRETVM_ENDPOINTS_MASK", "01010") // bit1=docker-compose, bit3=vm-upgrades open
 
@@ -225,8 +226,8 @@ var (
 	AccessToken    string
 	EndpointsMask  string
 
-	ItaApiUrl string
-	ItaKeys   map[string]ItaKeyInfo
+	ItaApiUrl    string
+	ItaKeys      map[string]ItaKeyInfo
 	EnableItaJwt bool
 	EnablePocJwt bool
 )
