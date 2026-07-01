@@ -9,10 +9,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"html"
 	"io"
 	"log"
 	"math"
+	"mime"
 	"net/http"
 	"os"
 	"os/exec"
@@ -260,11 +260,85 @@ func MakeDockerComposeFileHandler() http.HandlerFunc {
 			return
 		}
 
-		// Serve as HTML with pre tag to preserve trailing newlines
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{background:#1e1e1e;color:#e0e0e0;margin:0;padding:10px;font-family:monospace}pre{margin:0;white-space:pre}</style></head><body><pre>%s&#8203;</pre><script>document.oncopy=function(e){var s=window.getSelection().toString();if(s.endsWith('\u200B')){e.preventDefault();e.clipboardData.setData('text/plain',s.slice(0,-1))}}</script></body></html>`, html.EscapeString(string(content)))
+		if prefersDockerComposeHTML(r.Header.Get("Accept")) {
+			writeDockerComposeHTML(w, content)
+			return
+		}
+		writeDockerComposePlain(w, content)
+	}
+}
+
+func prefersDockerComposeHTML(accept string) bool {
+	return acceptQuality(accept, "text/html") > acceptQuality(accept, "text/plain")
+}
+
+func acceptQuality(accept, want string) float64 {
+	best := 0.0
+	wantType, wantSubtype, ok := strings.Cut(want, "/")
+	if !ok {
+		return best
+	}
+	for _, part := range strings.Split(accept, ",") {
+		mediaType, params, err := mime.ParseMediaType(strings.TrimSpace(part))
+		if err != nil {
+			continue
+		}
+		mediaTypePart, mediaSubtype, ok := strings.Cut(mediaType, "/")
+		if !ok {
+			continue
+		}
+		if mediaTypePart != "*" && mediaTypePart != wantType {
+			continue
+		}
+		if mediaSubtype != "*" && mediaSubtype != wantSubtype {
+			continue
+		}
+		quality := 1.0
+		if raw, ok := params["q"]; ok {
+			parsed, err := strconv.ParseFloat(raw, 64)
+			if err != nil {
+				continue
+			}
+			quality = parsed
+		}
+		if quality > best {
+			best = quality
+		}
+	}
+	return best
+}
+
+func writeDockerComposePlain(w http.ResponseWriter, content []byte) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	w.Write(content)
+}
+
+func writeDockerComposeHTML(w http.ResponseWriter, content []byte) {
+	data := struct {
+		Title       string
+		Description string
+		Quote       string
+		ShowVerify  bool
+	}{
+		Title:       "Docker Compose File",
+		Description: "Below is the docker-compose configuration. Click the copy button to copy it.",
+		Quote:       string(content),
+		ShowVerify:  false, // no verification link needed
+	}
+
+	tmpl, err := template.New("dockerCompose").Parse(htmlpkg.HtmlTemplate)
+	if err != nil {
+		log.Printf("Error parsing HTML template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := tmpl.Execute(w, data); err != nil {
+		log.Printf("Error executing HTML template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
 
@@ -287,32 +361,7 @@ func MakeDockerComposeHTMLHandler() http.HandlerFunc {
 			return
 		}
 
-		// Prepare data for the template
-		data := struct {
-			Title       string
-			Description string
-			Quote       string
-			ShowVerify  bool
-		}{
-			Title:       "Docker Compose File",
-			Description: "Below is the docker-compose configuration. Click the copy button to copy it.",
-			Quote:       string(content),
-			ShowVerify:  false, // no verification link needed
-		}
-
-		// Parse and execute shared HTML template
-		tmpl, err := template.New("dockerCompose").Parse(htmlpkg.HtmlTemplate)
-		if err != nil {
-			log.Printf("Error parsing HTML template: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := tmpl.Execute(w, data); err != nil {
-			log.Printf("Error executing HTML template: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
+		writeDockerComposeHTML(w, content)
 	}
 }
 

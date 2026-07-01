@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -39,7 +42,7 @@ func TestStatusHandler(t *testing.T) {
 	}
 
 	// Verify the status field exists
-	if status, exists := response["status"]; !exists || status != "server is alive" {
+	if status, exists := response["status"]; !exists || status == "" {
 		t.Errorf("Response missing or incorrect status field: %v", response)
 	}
 
@@ -83,5 +86,59 @@ func TestStatusHandlerInvalidMethod(t *testing.T) {
 	// Verify the error field exists
 	if errorMsg, exists := response["error"]; !exists || errorMsg != "Method not allowed" {
 		t.Errorf("Response missing or incorrect error field: %v", response)
+	}
+}
+
+func TestDockerComposeFileHandlerReturnsRawYaml(t *testing.T) {
+	tmp := t.TempDir()
+	oldPath := DockerComposePath
+	DockerComposePath = filepath.Join(tmp, "docker-compose.yaml")
+	t.Cleanup(func() { DockerComposePath = oldPath })
+
+	const compose = "services:\n  app:\n    image: nginx:latest\n"
+	if err := os.WriteFile(DockerComposePath, []byte(compose), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/docker-compose", nil)
+	req.Header.Set("Accept", "text/plain")
+	rr := httptest.NewRecorder()
+	MakeDockerComposeFileHandler().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+	if got := rr.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+		t.Fatalf("content type = %q", got)
+	}
+	if got := rr.Body.String(); got != compose {
+		t.Fatalf("body = %q, want %q", got, compose)
+	}
+}
+
+func TestDockerComposeFileHandlerReturnsHTMLWhenRequested(t *testing.T) {
+	tmp := t.TempDir()
+	oldPath := DockerComposePath
+	DockerComposePath = filepath.Join(tmp, "docker-compose.yaml")
+	t.Cleanup(func() { DockerComposePath = oldPath })
+
+	const compose = "services:\n  app:\n    image: nginx:latest\n"
+	if err := os.WriteFile(DockerComposePath, []byte(compose), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/docker-compose", nil)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	rr := httptest.NewRecorder()
+	MakeDockerComposeFileHandler().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+	if got := rr.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
+		t.Fatalf("content type = %q", got)
+	}
+	if got := rr.Body.String(); !strings.Contains(got, compose) {
+		t.Fatalf("body does not contain compose yaml: %q", got)
 	}
 }

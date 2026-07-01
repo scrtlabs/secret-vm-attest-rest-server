@@ -106,6 +106,7 @@ func init() {
 	RESTServerIP = GetEnv("SECRETVM_REST_SERVER_IP", "0.0.0.0")
 	Secure = GetBool("SECRETVM_SECURE", true)
 	Port = GetInt("SECRETVM_REST_SERVER_PORT", 29343)
+	PrivateMode = GetBool("SECRETVM_PRIVATE_MODE", true)
 
 	// Certificate paths
 	CertPath = GetEnv("SECRETVM_CERT_PATH", "cert/ssl_cert.pem")
@@ -135,8 +136,9 @@ func init() {
 	PublicKeySecp256k1Path = GetEnv("SECRETVM_PUBLIC_KEY_SECP256K1", "/mnt/secure/docker_wd/crypto/docker_public_key_secp256k1.pem")
 
 	// New sensitive config from extra env
-	AccessToken = GetEnv("SECRETVM_DEV_TOKEN", "")             // header: X-Dev-Token
-	EndpointsMask = GetEnv("SECRETVM_ENDPOINTS_MASK", "01010") // bit1=docker-compose, bit3=vm-upgrades open
+	AccessToken = GetEnv("SECRETVM_DEV_TOKEN", "") // header: X-Dev-Token
+	// Empty by default so guarded endpoints stay closed unless deployment config opens specific bits.
+	EndpointsMask = GetEnv("SECRETVM_ENDPOINTS_MASK", "") // bit1=docker-compose, bit3=vm-upgrades open
 
 	ItaApiUrl = GetEnv("SECRETVM_ITA_API_URL", "https://api.eu.trustauthority.intel.com/appraisal/v1/attest")
 
@@ -225,8 +227,8 @@ var (
 	AccessToken    string
 	EndpointsMask  string
 
-	ItaApiUrl string
-	ItaKeys   map[string]ItaKeyInfo
+	ItaApiUrl    string
+	ItaKeys      map[string]ItaKeyInfo
 	EnableItaJwt bool
 	EnablePocJwt bool
 )
